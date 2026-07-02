@@ -284,7 +284,7 @@ body {
     <div class="login-logo">北段辦規章查找系統</div>
     <div class="login-subtitle">TMRT 北段辦公室</div>
     <div id="login-error" class="login-error" style="display:none;"></div>
-    <input type="email" id="login-email" placeholder="電子郵件" autocomplete="username">
+    <input type="text" id="login-id" placeholder="員工編號" autocomplete="username" inputmode="numeric">
     <input type="password" id="login-password" placeholder="密碼" autocomplete="current-password">
     <button onclick="doLogin()" id="login-btn">登入</button>
   </div>
@@ -503,7 +503,8 @@ window._db = db;
 window._storage = storage;
 
 window.doLogin = async function() {
-  const email = document.getElementById('login-email').value.trim();
+  const id = document.getElementById('login-id').value.trim();
+  const email = id + '@tmrt.local';
   const pw = document.getElementById('login-password').value;
   const btn = document.getElementById('login-btn');
   const errEl = document.getElementById('login-error');
@@ -513,7 +514,7 @@ window.doLogin = async function() {
   try {
     await signInWithEmailAndPassword(auth, email, pw);
   } catch(e) {
-    errEl.textContent = '帳號或密碼錯誤，請重新輸入';
+    errEl.textContent = '員工編號或密碼錯誤，請重新輸入';
     errEl.style.display = 'block';
     btn.textContent = '登入';
     btn.disabled = false;
@@ -530,7 +531,7 @@ onAuthStateChanged(auth, async (user) => {
 
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
-    document.getElementById('user-email-display').textContent = user.email;
+    document.getElementById('user-email-display').textContent = user.email.replace('@tmrt.local','');
     document.getElementById('user-level-badge').textContent = level + '級';
     if (level === 'S') document.getElementById('admin-nav').style.display = 'block';
 
@@ -542,6 +543,9 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
+document.getElementById('login-id').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
 document.getElementById('login-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') window.doLogin();
 });
