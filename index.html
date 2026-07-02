@@ -504,7 +504,7 @@ window._storage = storage;
 
 window.doLogin = async function() {
   const id = document.getElementById('login-id').value.trim();
-  const email = id + '@tmrt.local';
+  const email = 'tcm' + id + '@tmrt.com.tw';
   const pw = document.getElementById('login-password').value;
   const btn = document.getElementById('login-btn');
   const errEl = document.getElementById('login-error');
@@ -531,7 +531,7 @@ onAuthStateChanged(auth, async (user) => {
 
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
-    document.getElementById('user-email-display').textContent = user.email.replace('@tmrt.local','');
+    document.getElementById('user-email-display').textContent = user.email.replace('tcm','').replace('@tmrt.com.tw','');
     document.getElementById('user-level-badge').textContent = level + '級';
     if (level === 'S') document.getElementById('admin-nav').style.display = 'block';
 
