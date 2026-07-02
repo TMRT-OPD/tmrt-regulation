@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>北段辦規章查找系統</title>
+<style>
+/* ===== 北段辦規章查找系統 / 莫蘭迪色系 ===== */
+:root {
+  --morandi-bg: #EDEAE3;
+  --morandi-surface: #F6F4EF;
+  --morandi-card: #FFFFFF;
+  --morandi-border: #DAD5C9;
+  --morandi-text: #4A4640;
+  --morandi-text-muted: #8C857A;
+  --morandi-accent: #8B9A8B;
+  --morandi-accent-dark: #5F6E5F;
+  --morandi-coral: #C49A8B;
+  --morandi-amber: #D2B48C;
+  --morandi-teal: #94A89A;
+  --morandi-danger: #C28B82;
+  --morandi-warning: #D4B483;
+  --morandi-success: #9CAF93;
+  --sidebar-width: 220px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  background: var(--morandi-bg);
+  color: var(--morandi-text);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ===== 登入頁面 ===== */
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--morandi-bg);
+}
+
+.login-card {
+  background: var(--morandi-surface);
+  border: 1px solid var(--morandi-border);
+  border-radius: 14px;
+  padding: 40px 36px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-logo {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--morandi-accent-dark);
+  margin-bottom: 2px;
+}
+
+.login-subtitle {
+  font-size: 12px;
+  color: var(--morandi-text-muted);
+  margin-bottom: 8px;
+}
+
+.login-card input {
+  border: 1px solid var(--morandi-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--morandi-text);
+  background: var(--morandi-card);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.login-card input:focus { border-color: var(--morandi-accent); }
+
+.login-card button {
+  background: var(--morandi-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s;
+}
+
+.login-card button:hover { background: var(--morandi-accent-dark); }
+.login-card button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.login-error {
+  background: #f5e0de;
+  color: #8c4a3a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* ===== 主系統 ===== */
+#app-screen { display: flex; min-height: 100vh; width: 100%; }
+
+/* ===== 左側導覽欄 ===== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--morandi-surface);
+  border-right: 1px solid var(--morandi-border);
+  padding: 24px 0;
+  flex-shrink: 0;
+  overflow-y: auto;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.sidebar-logo {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--morandi-accent-dark);
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--morandi-border);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px 10px;
+  font-size: 11px;
+  color: var(--morandi-text-muted);
+  border-bottom: 1px solid var(--morandi-border);
+  margin-bottom: 8px;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid var(--morandi-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--morandi-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.logout-btn:hover { border-color: var(--morandi-coral); color: var(--morandi-coral); }
+
+.level-badge {
+  font-size: 11px;
+  background: var(--morandi-accent);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.nav-item { display: block; }
+
+.nav-item-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 20px;
+  font-size: 14px;
+  color: var(--morandi-text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.nav-item-title:hover { background: var(--morandi-border); }
+.nav-item-title.active { background: var(--morandi-accent); color: #fff; }
+.nav-item-title.active .nav-arrow { color: #fff; }
+
+.nav-arrow {
+  font-size: 11px;
+  color: var(--morandi-text-muted);
+  transition: transform 0.2s;
+}
+
+.nav-item.open > .nav-item-title .nav-arrow { transform: rotate(90deg); }
+
+.nav-children {
+  display: none;
+  padding-left: 16px;
+  border-left: 1px solid var(--morandi-border);
+  margin-left: 24px;
+}
+
+.nav-item.open > .nav-children { display: block; }
+
+.nav-child {
+  display: block;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--morandi-text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.nav-child:hover { color: var(--morandi-accent-dark); }
+.nav-child.active { color: var(--morandi-accent-dark); font-weight: 500; }
+
+/* ===== 主內容區 ===== */
+.main { flex: 1; padding: 32px 40px; max-width: 1100px; overflow-y: auto; }
+
+.page-title { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+
+.page-subtitle {
+  font-size: 13px;
+  color: var(--morandi-text-muted);
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--morandi-card);
+  border: 1px solid var(--morandi-border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--morandi-card);
+  border: 1px solid var(--morandi-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  color: var(--morandi-text);
+}
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.tag-duty     { background: #E4E9DE; color: #5F6E50; }
+.tag-notice   { background: #F1E3CE; color: #8A6A3A; }
+.tag-reg      { background: #DDE3E0; color: #4F5E58; }
+.tag-revised  { background: #DCE6D5; color: #4A6B40; }
+.tag-unrevised{ background: #EAD6CF; color: #8C4A3A; }
+.tag-na       { background: #E8E6E0; color: #6B6560; }
+
+.placeholder-page {
+  color: var(--morandi-text-muted);
+  font-size: 13px;
+  padding: 40px 0;
+  text-align: center;
+  border: 1px dashed var(--morandi-border);
+  border-radius: 10px;
+}
+</style>
+</head>
+<body>
+
+<!-- 登入頁面 -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">北段辦規章查找系統</div>
+    <div class="login-subtitle">TMRT 北段辦公室</div>
+    <div id="login-error" class="login-error" style="display:none;"></div>
+    <input type="email" id="login-email" placeholder="電子郵件" autocomplete="username">
+    <input type="password" id="login-password" placeholder="密碼" autocomplete="current-password">
+    <button onclick="doLogin()" id="login-btn">登入</button>
+  </div>
+</div>
+
+<!-- 主系統 -->
+<div id="app-screen" style="display:none;">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      北段辦規章查找系統
+      <span id="user-level-badge" class="level-badge"></span>
+    </div>
+    <div class="sidebar-user">
+      <span id="user-email-display"></span>
+      <button onclick="doLogout()" class="logout-btn">登出</button>
+    </div>
+
+    <div class="nav-item">
+      <div class="nav-item-title" onclick="goToPage('readme', this)">導讀</div>
+    </div>
+    <div class="nav-item">
+      <div class="nav-item-title" onclick="goToPage('search', this)">綜合查詢</div>
+    </div>
+    <div class="nav-item">
+      <div class="nav-item-title" onclick="toggleNav(this)">
+        <span>勤前指示</span><span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" onclick="goToPage('duty-active', this)">效期內勤前</div>
+        <div class="nav-child" onclick="goToPage('duty-expired', this)">逾期勤前</div>
+      </div>
+    </div>
+    <div class="nav-item">
+      <div class="nav-item-title" onclick="toggleNav(this)">
+        <span>通告</span><span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" onclick="goToPage('notice-active', this)">效期內通告</div>
+        <div class="nav-child" onclick="goToPage('notice-expired', this)">逾期通告</div>
+      </div>
+    </div>
+    <div class="nav-item">
+      <div class="nav-item-title" onclick="toggleNav(this)">
+        <span>規章</span><span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-children" id="regulation-tree"></div>
+    </div>
+    <div class="nav-item" id="admin-nav" style="display:none;">
+      <div class="nav-item-title" onclick="toggleNav(this)">
+        <span>後臺控管</span><span class="nav-arrow">›</span>
+      </div>
+      <div class="nav-children">
+        <div class="nav-child" onclick="goToPage('admin-upload', this)">規章上傳</div>
+        <div class="nav-child" onclick="goToPage('admin-revise', this)">規章修訂</div>
+        <div class="nav-child" onclick="goToPage('admin-permission', this)">系統權限</div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main" id="main-content"></main>
+</div>
+
+<script>
+// ===== 規章樹狀結構 =====
+const regulationTree = {
+  "人力資源處(HRD)": null,
+  "工安處(ISD)": null,
+  "企劃處(PLD)": null,
+  "行政處(ADD)": null,
+  "財會處(FAD)": null,
+  "副總經理室(VPO)": null,
+  "資訊處(IMD)": null,
+  "運務處(OPD)": {
+    "行控中心OCC": null,
+    "站務中心SOC": null,
+    "票務中心TKC": null,
+    "運務處OPD": null
+  },
+  "維修處(MAD)": {
+    "車輛廠RSP": { "DEQ機廠設備": null, "EMU電聯車": null, "GEN共通": null },
+    "軌道土木廠TCP": { "CVC土建": null, "CVH工程車": null, "DEQ機廠設備": null, "GEN共通": null, "TKM軌道": null },
+    "電子廠ELP": { "COM通訊系統": null, "GEN共通性": null, "OCS號誌系統": null },
+    "電機廠EMP": {
+      "FFS消防系統": { "AFE自動氣體滅火系統": null, "FA消防警報系統": null, "FW消防水系統": null, "OT其他": null },
+      "GEN共通": { "MN管理": null },
+      "PWR電力系統": { "BSS主變電站": null, "FPSS設備變電站": null, "OT其他": null, "PPSS牽引動力變電站": null, "PRC電力遙控系統": null, "WSE道旁設備": null },
+      "SME車站設備": { "ACS空調系統": null, "ELV電梯": null, "ESC電扶梯": null }
+    },
+    "維修處MAD": { "DEQ機廠設備": null, "GEN共通": { "MN管理": null, "OT其他": null, "SF安全": null } }
+  }
+};
+
+const DEFAULT_EXPANDED = "運務處(OPD)";
+
+function buildRegulationTree() {
+  const container = document.getElementById("regulation-tree");
+  if (!container) return;
+  container.innerHTML = "";
+  buildTree(regulationTree, container, "規章");
+}
+
+function buildTree(node, container, path) {
+  for (const key in node) {
+    const item = document.createElement("div");
+    item.className = "nav-item";
+    const title = document.createElement("div");
+    const children = node[key];
+    if (children) {
+      title.className = "nav-item-title";
+      title.style.fontSize = "13px";
+      title.style.padding = "8px 16px";
+      title.innerHTML = `<span>${key}</span><span class="nav-arrow">›</span>`;
+      title.onclick = () => toggleNav(title);
+      item.appendChild(title);
+      const childContainer = document.createElement("div");
+      childContainer.className = "nav-children";
+      buildTree(children, childContainer, path + "/" + key);
+      item.appendChild(childContainer);
+      if (key === DEFAULT_EXPANDED) item.classList.add("open");
+    } else {
+      title.className = "nav-child";
+      title.textContent = key;
+      title.onclick = () => goToPage("regulation-unit", title, path + "/" + key);
+      item.appendChild(title);
+    }
+    container.appendChild(item);
+  }
+}
+
+function toggleNav(titleEl) {
+  titleEl.closest(".nav-item").classList.toggle("open");
+}
+
+// ===== 頁面渲染 =====
+function goToPage(pageKey, el, param) {
+  const main = document.getElementById("main-content");
+  const pages = {
+    readme: () => `
+      <div class="page-title">導讀</div>
+      <div class="page-subtitle">系統說明文件，提供整體架構與依據規定參考</div>
+      <div class="card"><strong>(1) 勤前 / 通告 / 規章　三階段生命週期圖</strong>
+        <div class="placeholder-page" style="margin-top:12px;">內容待修訂，圖表後續嵌入</div></div>
+      <div class="card"><strong>(2) ISO 系統之四階標準文件架構圖</strong>
+        <div class="placeholder-page" style="margin-top:12px;">圖表後續嵌入</div></div>
+      <div class="card"><strong>(3) 公司規則管理辦法</strong>
+        <div class="placeholder-page" style="margin-top:12px;">PDF 後續嵌入</div></div>`,
+    search: () => `
+      <div class="page-title">綜合查詢</div>
+      <div class="page-subtitle">搜尋結果依「效期內勤前 → 效期內通告 → 規章」排序</div>
+      <div class="search-bar"><input placeholder="輸入關鍵字，例如：請假"></div>
+      <div class="placeholder-page">搜尋結果區域（待接 Firestore 資料）</div>`,
+    "duty-active": () => `
+      <div class="page-title">效期內勤前</div>
+      <div class="page-subtitle">依到期日排序，越快到期排越前面</div>
+      <div class="search-bar"><input placeholder="搜尋勤前指示"></div>
+      <div class="placeholder-page">勤前指示清單（待接 Firestore 資料）</div>`,
+    "duty-expired": () => `
+      <div class="page-title">逾期勤前</div>
+      <div class="page-subtitle">以年份排序歸檔</div>
+      <div class="placeholder-page">歷史勤前指示（待接 Firestore 資料）</div>`,
+    "notice-active": () => `
+      <div class="page-title">效期內通告</div>
+      <div class="page-subtitle">含展延通告（另行註記）；右側標示已修訂／未修訂狀態</div>
+      <div class="search-bar"><input placeholder="搜尋通告"></div>
+      <div class="placeholder-page">通告清單（待接 Firestore 資料）</div>`,
+    "notice-expired": () => `
+      <div class="page-title">逾期通告</div>
+      <div class="page-subtitle">以年份排序歸檔</div>
+      <div class="placeholder-page">歷史通告（待接 Firestore 資料）</div>`,
+    "regulation-unit": () => `
+      <div class="page-title">規章 — ${param ? param.split("/").pop() : ""}</div>
+      <div class="page-subtitle">${param || ""}</div>
+      <div class="placeholder-page">該單位規章清單（待接 Firestore 資料）</div>`,
+    "admin-upload": () => `
+      <div class="page-title">後臺控管 — 規章上傳</div>
+      <div class="page-subtitle">上傳後將自動覆蓋該規章，並記錄上傳日期及版次（S 級限定）</div>
+      <div class="placeholder-page">上傳介面區域</div>`,
+    "admin-revise": () => `
+      <div class="page-title">後臺控管 — 規章修訂</div>
+      <div class="page-subtitle">關鍵字交叉比對，避免修訂時掛一漏萬（S 級限定）</div>
+      <div class="placeholder-page">修訂比對介面區域</div>`,
+    "admin-permission": () => `
+      <div class="page-title">後臺控管 — 系統權限</div>
+      <div class="page-subtitle">S / A / B 各層級權限對照表（S 級限定）</div>
+      <div class="placeholder-page">權限對照表區域</div>`
+  };
+  main.innerHTML = (pages[pageKey] || (() => `<div class="placeholder-page">頁面開發中</div>`))();
+  document.querySelectorAll(".nav-item-title, .nav-child").forEach(n => n.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+</script>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBaYrnW9wBC4vpqRDH86HfL_zk3RhaqgY0",
+  authDomain: "tmrt-regulation-aae6f.firebaseapp.com",
+  projectId: "tmrt-regulation-aae6f",
+  storageBucket: "tmrt-regulation-aae6f.firebasestorage.app",
+  messagingSenderId: "684290109416",
+  appId: "1:684290109416:web:a3854d7ded1551e2f97e5d"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+window._db = db;
+window._storage = storage;
+
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  btn.textContent = '登入中…';
+  btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch(e) {
+    errEl.textContent = '帳號或密碼錯誤，請重新輸入';
+    errEl.style.display = 'block';
+    btn.textContent = '登入';
+    btn.disabled = false;
+  }
+};
+
+window.doLogout = async function() { await signOut(auth); };
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const level = userDoc.exists() ? userDoc.data().level : 'B';
+    window._userLevel = level;
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+    document.getElementById('user-email-display').textContent = user.email;
+    document.getElementById('user-level-badge').textContent = level + '級';
+    if (level === 'S') document.getElementById('admin-nav').style.display = 'block';
+
+    buildRegulationTree();
+    goToPage('readme', document.querySelector('.nav-item-title'));
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+  }
+});
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.doLogin();
+});
+</script>
+</body>
+</html>
