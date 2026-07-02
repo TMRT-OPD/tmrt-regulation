@@ -505,6 +505,7 @@ window._storage = storage;
 window.doLogin = async function() {
   const id = document.getElementById('login-id').value.trim();
   const email = 'tcm' + id + '@tmrt.com.tw';
+  console.log('嘗試登入 email:', email);
   const pw = document.getElementById('login-password').value;
   const btn = document.getElementById('login-btn');
   const errEl = document.getElementById('login-error');
@@ -515,6 +516,7 @@ window.doLogin = async function() {
     await signInWithEmailAndPassword(auth, email, pw);
   } catch(e) {
     errEl.textContent = '員工編號或密碼錯誤，請重新輸入';
+    console.log('登入失敗:', e.code, e.message);
     errEl.style.display = 'block';
     btn.textContent = '登入';
     btn.disabled = false;
