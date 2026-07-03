@@ -329,8 +329,9 @@ async function loadUsers(){
     tbody.innerHTML='';
     snap.forEach(d=>{
       const data=d.data();const isSelf=d.id===window._uid;
-      const tr=document.createElement('tr');tr.dataset.uid=d.id;tr.dataset.search=(data.id||'')+(data.name||'');
-      tr.innerHTML=`<td>${data.id||d.id}</td><td>${data.name||'—'}</td><td><span class="badge lv-${(data.level||'B').toLowerCase()}">${data.level||'B'} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${data.level||'B'}')"><i class="ti ti-edit"></i> 編輯</button>${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
+      const tr=document.createElement('tr');tr.dataset.uid=d.id;const _empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):'');tr.dataset.search=_empId+(data.name||'');
+      const empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):d.id);
+      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${(data.level||'B').toLowerCase()}">${data.level||'B'} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${data.level||'B'}')"><i class="ti ti-edit"></i> 編輯</button>${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
       tbody.appendChild(tr);
     });
   }catch(e){tbody.innerHTML=`<tr><td colspan="5" class="empty">載入失敗：${e.message}</td></tr>`;}
@@ -348,13 +349,28 @@ async function saveAcc(){
   if(!_editUid&&!pwd){errEl.textContent='請輸入密碼';return}
   if(pwd&&pwd.length<6){errEl.textContent='密碼至少 6 個字元';return}
   try{
+    const {initializeApp,deleteApp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
     const {getAuth,createUserWithEmailAndPassword}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     const {doc,setDoc,updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const email='tcm'+id+'@tmrt.com.tw';
-    if(!_editUid){const cred=await createUserWithEmailAndPassword(getAuth(),email,pwd);await setDoc(doc(window._db,'users',cred.user.uid),{id,name,level,email,createdAt:serverTimestamp()});}
-    else{await updateDoc(doc(window._db,'users',_editUid),{name,level});}
+    if(!_editUid){
+      // 使用第二個 Firebase App 實例建帳號，避免影響目前登入的管理員 session
+      const secondaryApp=initializeApp(window._fbConfig,'secondary-'+Date.now());
+      const secondaryAuth=getAuth(secondaryApp);
+      try{
+        const cred=await createUserWithEmailAndPassword(secondaryAuth,email,pwd);
+        await setDoc(doc(window._db,'users',cred.user.uid),{id,name,level,email,createdAt:serverTimestamp()});
+      }finally{
+        await deleteApp(secondaryApp);
+      }
+    }else{
+      await updateDoc(doc(window._db,'users',_editUid),{name,level});
+    }
     closeModal('modal-acc');showToast(_editUid?'帳號已更新':'帳號已新增');loadUsers();
-  }catch(e){errEl.textContent='操作失敗：'+e.message;}
+  }catch(e){
+    if(e.code==='auth/email-already-in-use'){errEl.textContent='此員工編號已存在，如需重建請先至 Firebase Console 刪除舊帳號';}
+    else{errEl.textContent='操作失敗：'+e.message;}
+  }
 }
 async function deleteAcc(uid,empId){
   if(!confirm(`確定要刪除員工編號 ${empId} 的帳號嗎？`))return;
@@ -405,7 +421,8 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.0/firebase
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {getFirestore,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {getStorage} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-const app=initializeApp({apiKey:"AIzaSyBaYrnW9w8C4vpqRDH86HfL_zk3Rhaqgy0",authDomain:"tmrt-regulation-aae6f.firebaseapp.com",projectId:"tmrt-regulation-aae6f",storageBucket:"tmrt-regulation-aae6f.firebasestorage.app",messagingSenderId:"684290109416",appId:"1:684290109416:web:a3854d7ded1551e2f97e5d"});
+window._fbConfig={apiKey:"AIzaSyBaYrnW9w8C4vpqRDH86HfL_zk3Rhaqgy0",authDomain:"tmrt-regulation-aae6f.firebaseapp.com",projectId:"tmrt-regulation-aae6f",storageBucket:"tmrt-regulation-aae6f.firebasestorage.app",messagingSenderId:"684290109416",appId:"1:684290109416:web:a3854d7ded1551e2f97e5d"};
+const app=initializeApp(window._fbConfig);
 const auth=getAuth(app),db=getFirestore(app);
 window._db=db;window._uid='';window._storage=getStorage(app);
 window.doLogin=async function(){
