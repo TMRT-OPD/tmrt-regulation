@@ -15,10 +15,10 @@ body{font-family:var(--fs);background:var(--ct);display:flex;min-height:100vh;co
 .logo-area img{height:52px;width:auto;display:block;margin:0 auto 10px}
 .sys-name{font-size:16px;font-weight:500;color:var(--tp);margin-top:2px}
 .sys-sub{font-size:11px;color:var(--ts);margin-top:3px}
-.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}.login-form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
 .fl{font-size:12px;color:var(--ts);font-weight:500}
 .iw{position:relative}
-.iw input{font-family:var(--fs);font-size:13px;padding:8px 36px 8px 11px;border-radius:var(--rm);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);width:100%;transition:border-color .15s}
+.iw input{font-family:var(--fs);font-size:13px;padding:8px 36px 8px 12px;border-radius:var(--rm);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);width:100%;transition:border-color .15s}
 .iw input:focus{outline:none;border-color:#378ADD}
 .eyebtn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--tt);font-size:15px;padding:2px}
 .lbtn{width:100%;padding:9px;font-size:13px;font-weight:500;background:#378ADD;color:#fff;border:none;border-radius:var(--rm);cursor:pointer;font-family:var(--fs);margin-top:6px}
@@ -395,7 +395,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
     <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl')">
     <div class="file-list" id="nfl"></div></div>
   <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveDuty.call(this,event)"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div>`;}
 
 function pageUploadReg(){return`<div class="ptitle">後臺控管 — 規章上傳</div><div class="psub">上傳後自動更新規章，並保留版本歷史</div>
@@ -412,7 +412,7 @@ function pageUploadReg(){return`<div class="ptitle">後臺控管 — 規章上�
     <input type="file" id="rfs" accept=".pdf" style="display:none" onchange="showFiles(this,'rfl')">
     <div class="file-list" id="rfl"></div></div>
   <div class="info-box"><i class="ti ti-info-circle"></i>上傳後系統將自動擷取文字建立關鍵字索引，並保留舊版本供查詢</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveReg.call(this,event)"><i class="ti ti-check"></i> 上傳規章</button><button class="btn" onclick="clearForm(['rd','rt','rv','rp'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveReg()"><i class="ti ti-check"></i> 上傳規章</button><button class="btn" onclick="clearForm(['rd','rt','rv','rp'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div>`;}
 
 function pageRevise(){return`<div class="ptitle">後臺控管 — 規章修訂比對</div><div class="psub">輸入關鍵字，系統自動比對所有規章，避免修訂時掛一漏萬</div>
@@ -531,6 +531,128 @@ async function doChangePwd(){
   }
 }
 
+
+
+// ===== Firebase Storage 上傳共用函式 =====
+async function uploadFile(file, storagePath) {
+  const {ref, uploadBytes, getDownloadURL} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js");
+  const fileRef = ref(window._storage, storagePath);
+  await uploadBytes(fileRef, file);
+  return await getDownloadURL(fileRef);
+}
+
+async function saveDuty() {
+  const title = document.getElementById('dt')?.value?.trim();
+  const fromDate = document.getElementById('df')?.value;
+  if (!title) { showToast('請輸入勤前指示標題'); return; }
+  if (!fromDate) { showToast('請輸入發布日期'); return; }
+  const btn = document.querySelector('#td-m .btn-primary');
+  setBtnLoading(btn, '儲存中…');
+  try {
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const fileInput = document.getElementById('dfs');
+    const attachments = [];
+    if (fileInput && fileInput.files.length > 0) {
+      for (const file of fileInput.files) {
+        const url = await uploadFile(file, `duty_briefs/${new Date().getFullYear()}/${Date.now()}_${file.name}`);
+        attachments.push({name: file.name, url, size: file.size});
+      }
+    }
+    await addDoc(collection(window._db, 'duty_briefs'), {
+      title,
+      unit: document.getElementById('du')?.value || '',
+      issuedDate: fromDate,
+      expiryDate: document.getElementById('de')?.value || null,
+      content: document.getElementById('dc')?.value || '',
+      attachments, status: 'active',
+      createdAt: serverTimestamp(), createdBy: window._uid
+    });
+    setBtnSuccess(btn, '已儲存');
+    showToast('勤前指示已儲存');
+    ['dt','du','dc'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['df','de'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const fl = document.getElementById('dfl'); if (fl) fl.innerHTML = '';
+  } catch(e) {
+    setBtnError(btn);
+    showToast('儲存失敗：' + e.message);
+  }
+}
+
+async function saveNotice() {
+  const title = document.getElementById('nt')?.value?.trim();
+  const fromDate = document.getElementById('nf')?.value;
+  const toDate = document.getElementById('ne')?.value;
+  if (!title) { showToast('請輸入通告標題'); return; }
+  if (!fromDate || !toDate) { showToast('請輸入生效及到期日期'); return; }
+  const btn = document.querySelector('.card .btn-primary');
+  setBtnLoading(btn, '發布中…');
+  try {
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const fileInput = document.getElementById('nfs');
+    const attachments = [];
+    if (fileInput && fileInput.files.length > 0) {
+      for (const file of fileInput.files) {
+        const url = await uploadFile(file, `notices/${new Date().getFullYear()}/${Date.now()}_${file.name}`);
+        attachments.push({name: file.name, url, size: file.size});
+      }
+    }
+    await addDoc(collection(window._db, 'notices'), {
+      title,
+      unit: document.getElementById('nu')?.value || '',
+      issuedDate: fromDate,
+      expiryDate: toDate,
+      extended: document.getElementById('nx')?.value === '1',
+      revised: document.getElementById('nr')?.value === '1',
+      content: document.getElementById('nc')?.value || '',
+      linkedRegulation: document.getElementById('nreg')?.value || '',
+      attachments, status: 'active',
+      createdAt: serverTimestamp(), createdBy: window._uid
+    });
+    setBtnSuccess(btn, '已發布');
+    showToast('通告已發布');
+    ['nt','nu','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
+  } catch(e) {
+    setBtnError(btn);
+    showToast('發布失敗：' + e.message);
+  }
+}
+
+async function saveReg() {
+  const docNo = document.getElementById('rd')?.value?.trim();
+  const title = document.getElementById('rt')?.value?.trim();
+  const fileInput = document.getElementById('rfs');
+  if (!docNo || !title) { showToast('請輸入文件編號與名稱'); return; }
+  if (!fileInput || fileInput.files.length === 0) { showToast('請選取規章 PDF 檔案'); return; }
+  const btn = document.querySelector('#reg-drop-zone')?.closest('.card')?.querySelector('.btn-primary') || document.querySelector('.btn-primary');
+  setBtnLoading(btn, '上傳中…');
+  try {
+    const ver = document.getElementById('rv')?.value || '1';
+    const file = fileInput.files[0];
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const fileUrl = await uploadFile(file, `regulations/${docNo}/${ver}/${file.name}`);
+    await addDoc(collection(window._db, 'regulations'), {
+      docNo, title,
+      dept: document.getElementById('rdept')?.value || '',
+      tier: parseInt(document.getElementById('rtier')?.value) || 2,
+      version: ver,
+      approvedDate: document.getElementById('rdate')?.value || '',
+      parentDoc: document.getElementById('rp')?.value || '',
+      fileUrl, fileName: file.name, fileSize: file.size,
+      status: 'active',
+      createdAt: serverTimestamp(), uploadedBy: window._uid
+    });
+    setBtnSuccess(btn, '上傳成功');
+    showToast('規章已上傳');
+    ['rd','rt','rv','rp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const fl = document.getElementById('rfl'); if (fl) fl.innerHTML = '';
+  } catch(e) {
+    setBtnError(btn);
+    showToast('上傳失敗：' + e.message);
+    console.error(e);
+  }
+}
 
 // ===== 拖曳上傳 =====
 function initDropZone(zoneId, inputId, listId) {
