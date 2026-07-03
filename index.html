@@ -230,6 +230,7 @@ function gp(key,el,param){
   };
   r.innerHTML=(map[key]||(()=>'<div class="pholder">頁面開發中</div>'))();
   if(key==='admin-perm') initPermPage();
+  if(key==='readme') setTimeout(loadReadmeReg, 0);
   if(key==='admin-upload-reg') initDropZone('reg-drop-zone','rfs','rfl');
   if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); }
   if(key==='admin-upload-notice') initDropZone('notice-drop-zone','nfs','nfl');
@@ -346,7 +347,7 @@ function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">�
 
 <div class="card">
 <div class="card-title">(3) 公司規則管理辦法（TMRT-HRD-GEN-0-2045）</div>
-<div class="pholder" style="border:1px dashed #b5d4f4;color:#378ADD">Firebase Storage 串接後嵌入 PDF 供線上查閱</div>
+<div id="readme-reg-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:20px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>
 </div>
 `;}
 
@@ -357,7 +358,91 @@ function pageDutyActive(){const c=window._level==='S'||window._level==='A';retur
 function pageDutyExpired(){return`<div class="ptitle">逾期勤前</div><div class="psub">以年份排序歸檔</div><div class="sb"><i class="ti ti-search"></i><input placeholder="搜尋逾期勤前"><select style="width:120px;padding:5px 8px;font-size:12px"><option>全部年份</option></select></div><div class="pholder">尚無逾期勤前記錄</div>`;}
 function pageNoticeActive(){const c=window._level==='S'||window._level==='A';return`<div class="ptitle">效期內通告</div><div class="psub">含展延通告（另行標記）；標示已修訂／未修訂狀態</div>${c?'<button class="btn btn-primary" style="margin-bottom:14px" onclick="gp(&apos;admin-upload-notice&apos;,null)"><i class="ti ti-plus"></i> 新增通告</button>':''}  <div class="sb"><i class="ti ti-search"></i><input placeholder="搜尋通告"></div><div class="pholder">尚無效期內通告</div>`;}
 function pageNoticeExpired(){return`<div class="ptitle">逾期通告</div><div class="psub">以年份排序歸檔</div><div class="sb"><i class="ti ti-search"></i><input placeholder="搜尋逾期通告"><select style="width:120px;padding:5px 8px;font-size:12px"><option>全部年份</option></select></div><div class="pholder">尚無逾期通告記錄</div>`;}
-function pageRegUnit(p){return`<div class="ptitle">規章 — ${p?p.split(' / ').pop():''}</div><div class="psub">${p||''}</div><div class="pholder">該單位規章清單（待接 Firestore 資料）</div>`;}
+function pageRegUnit(p){
+  const unitName = p ? p.split(' / ').pop() : '';
+  const html = `<div class="ptitle">規章 — ${unitName}</div><div class="psub">${p||''}</div>
+  <div id="reg-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
+  setTimeout(() => loadRegList(unitName), 0);
+  return html;
+}
+
+
+async function loadReadmeReg() {
+  const area = document.getElementById('readme-reg-area');
+  if (!area) return;
+  try {
+    const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const q = query(
+      collection(window._db, 'regulations'),
+      where('docNo', '==', 'TMRT-HRD-GEN-0-2045'),
+      where('status', '==', 'active')
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      area.innerHTML = '<div class="pholder" style="border:1px dashed #b5d4f4;color:#378ADD">尚未上傳，請至後臺控管 → 規章上傳</div>';
+      return;
+    }
+    let d;
+    snap.forEach(doc => { d = doc.data(); });
+    area.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+        <i class="ti ti-file-type-pdf" style="font-size:28px;color:#E24B4A;flex-shrink:0"></i>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${d.title}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary, #6b6b67);margin-top:2px">版次 ${d.version||'—'} ／ 核決日期：${d.approvedDate||'—'} ／ ${d.fileName||''} (${d.fileSize ? (d.fileSize/1024).toFixed(0)+'KB' : ''})</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <a href="${d.fileUrl}" target="_blank" class="btn btn-primary btn-sm"><i class="ti ti-eye"></i> 線上查閱</a>
+          <a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>
+        </div>
+      </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
+  }
+}
+
+async function loadRegList(unitName) {
+  const area = document.getElementById('reg-list-area');
+  if (!area) return;
+  try {
+    const {collection, query, where, orderBy, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const q = query(
+      collection(window._db, 'regulations'),
+      where('dept', '==', unitName),
+      where('status', '==', 'active')
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      area.innerHTML = '<div class="pholder">此單位尚無規章資料</div>';
+      return;
+    }
+    const canEdit = window._level === 'S' || window._level === 'A';
+    let rows = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
+      rows += `<tr>
+        <td><strong>${d.docNo||'—'}</strong></td>
+        <td>${d.title||'—'}</td>
+        <td><span class="badge" style="background:#e6f1fb;color:#0c447c">${tierLabels[d.tier]||'—'}</span></td>
+        <td>版次 ${d.version||'—'}</td>
+        <td>${d.approvedDate||'—'}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 查閱</a>` : ''}
+          ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+        </td>
+      </tr>`;
+    });
+    area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
+      <table class="vtbl">
+        <thead><tr><th>文件編號</th><th>文件名稱</th><th>位階</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
+  }
+}
 
 function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上傳</div><div class="psub">新增勤前指示或從 Google Sheets 批次匯入</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'td-m')">手動新增</div><div class="tab" onclick="switchTab(this,'td-s')">從 Google Sheets 匯入</div></div>
