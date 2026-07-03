@@ -93,15 +93,20 @@ textarea{resize:vertical;min-height:80px}
 .tab{padding:8px 16px;font-size:13px;color:var(--ts);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px}
 .tab:hover{color:var(--tp)}.tab.active{color:#378ADD;border-bottom-color:#378ADD}
 .tabpane{display:none}.tabpane.active{display:block}
-.upload-zone{border:1.5px dashed var(--bs);border-radius:var(--rl);padding:24px;text-align:center;cursor:pointer;background:var(--cs)}
-.upload-zone:hover{border-color:#378ADD}
+.upload-zone{border:1.5px dashed var(--bs);border-radius:var(--rl);padding:24px;text-align:center;cursor:pointer;background:var(--cs);transition:border-color .15s,background .15s}
+.upload-zone:hover{border-color:#378ADD;background:#f0f6fd}
+.upload-zone.drag-over{border-color:#378ADD;background:#e6f1fb;border-style:solid}
 .upload-zone i{font-size:28px;color:var(--tt);display:block;margin-bottom:8px}
 .upload-zone span{font-size:12px;color:var(--ts)}
+.upload-progress{height:4px;background:var(--cs);border-radius:2px;margin-top:10px;overflow:hidden;display:none}
+.upload-progress-bar{height:100%;background:#378ADD;border-radius:2px;width:0%;transition:width .3s}
+.btn-success-temp{background:#1D9E75!important;border-color:#1D9E75!important}
 .file-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
 .file-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--cp);border:0.5px solid var(--bt);border-radius:var(--rm);font-size:12px}
 .file-item i{font-size:15px;color:var(--tt)}.file-item span{flex:1}
 .file-item button{background:none;border:none;cursor:pointer;color:var(--tt);font-size:13px;padding:2px}
 .file-item button:hover{color:#E24B4A}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -224,7 +229,10 @@ function gp(key,el,param){
     'admin-upload-reg':pageUploadReg,'admin-revise':pageRevise,'admin-perm':pagePerm
   };
   r.innerHTML=(map[key]||(()=>'<div class="pholder">頁面開發中</div>'))();
-  if(key==='admin-perm')initPermPage();
+  if(key==='admin-perm') initPermPage();
+  if(key==='admin-upload-reg') initDropZone('reg-drop-zone','rfs','rfl');
+  if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); }
+  if(key==='admin-upload-notice') initDropZone('notice-drop-zone','nfs','nfl');
 }
 
 function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">系統說明與參考依據</div>
@@ -358,7 +366,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">發布日期 *</label><input type="date" id="df"></div><div><label class="fl2">到期日期</label><input type="date" id="de"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">內容說明</label><textarea id="dc" placeholder="請輸入勤前指示內容…"></textarea></div>
   <div style="margin-bottom:12px"><label class="fl2">附件（支援 PDF、Word、Excel、PPT、圖片）</label>
-    <div class="upload-zone" onclick="document.getElementById('dfs').click()"><i class="ti ti-upload"></i><span>點擊或拖曳檔案至此處</span></div>
+    <div id="duty-drop-zone" class="upload-zone" onclick="document.getElementById('dfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處</span></div>
     <input type="file" id="dfs" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" style="display:none" onchange="showFiles(this,'dfl')">
     <div class="file-list" id="dfl"></div></div>
   <div class="info-box"><i class="ti ti-info-circle"></i>儲存後將同步至 Firestore，效期內勤前頁面即可查閱</div>
@@ -383,7 +391,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div style="margin-bottom:12px"><label class="fl2">通告內容</label><textarea id="nc" placeholder="請輸入通告內容…"></textarea></div>
   <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="nreg" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
   <div style="margin-bottom:12px"><label class="fl2">附件</label>
-    <div class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或拖曳檔案至此處</span></div>
+    <div id="notice-drop-zone" class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處</span></div>
     <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl')">
     <div class="file-list" id="nfl"></div></div>
   <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次</div>
@@ -400,7 +408,7 @@ function pageUploadReg(){return`<div class="ptitle">後臺控管 — 規章上�
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">版次</label><input type="text" id="rv" placeholder="例：5"></div><div><label class="fl2">核決日期</label><input type="date" id="rdate"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">上位文件編號（選填）</label><input type="text" id="rp" placeholder="請輸入上位文件編號"></div>
   <div style="margin-bottom:12px"><label class="fl2">規章檔案（PDF）*</label>
-    <div class="upload-zone" onclick="document.getElementById('rfs').click()"><i class="ti ti-file-type-pdf"></i><span>點擊選取規章 PDF 檔案</span></div>
+    <div id="reg-drop-zone" class="upload-zone" onclick="document.getElementById('rfs').click()"><i class="ti ti-file-type-pdf"></i><span>點擊選取或將 PDF 拖曳至此處</span></div>
     <input type="file" id="rfs" accept=".pdf" style="display:none" onchange="showFiles(this,'rfl')">
     <div class="file-list" id="rfl"></div></div>
   <div class="info-box"><i class="ti ti-info-circle"></i>上傳後系統將自動擷取文字建立關鍵字索引，並保留舊版本供查詢</div>
@@ -521,6 +529,48 @@ async function doChangePwd(){
     if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){errEl.textContent='目前密碼輸入錯誤';}
     else{errEl.textContent='修改失敗：'+e.message;}
   }
+}
+
+
+// ===== 拖曳上傳 =====
+function initDropZone(zoneId, inputId, listId) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    // 建立 DataTransfer 模擬 files 設定
+    const dt = new DataTransfer();
+    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    showFiles(input, listId);
+  });
+}
+
+// 按鈕狀態管理
+function setBtnLoading(btn, text) {
+  if (!btn) return;
+  btn.disabled = true;
+  btn._origHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> ' + text;
+}
+function setBtnSuccess(btn, text) {
+  if (!btn) return;
+  btn.classList.add('btn-success-temp');
+  btn.innerHTML = '<i class="ti ti-check"></i> ' + text;
+  setTimeout(() => {
+    btn.classList.remove('btn-success-temp');
+    btn.innerHTML = btn._origHTML || btn.innerHTML;
+    btn.disabled = false;
+  }, 2000);
+}
+function setBtnError(btn) {
+  if (!btn) return;
+  btn.innerHTML = btn._origHTML || btn.innerHTML;
+  btn.disabled = false;
 }
 
 function importFromSheets(){showToast("Google Sheets 連線功能開發中");}
