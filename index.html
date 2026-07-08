@@ -404,6 +404,7 @@ function pageDuty(){
   <div class="tabs" id="duty-tabs">
     <div class="tab ${window._dutyState.tab==='active'?'active':''}" data-tab="active" onclick="switchListTab('duty','active')">效期內</div>
     <div class="tab ${window._dutyState.tab==='expired'?'active':''}" data-tab="expired" onclick="switchListTab('duty','expired')">逾期</div>
+    <div class="tab ${window._dutyState.tab==='missing'?'active':''}" data-tab="missing" onclick="switchListTab('duty','missing')" style="color:#856404">缺到期日</div>
     <div class="tab ${window._dutyState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('duty','all')">全部</div>
   </div>
   <div class="sb"><i class="ti ti-search"></i><input id="duty-search" placeholder="搜尋勤前指示" oninput="renderDutyList()"></div>
@@ -419,6 +420,7 @@ function pageNotice(){
   <div class="tabs" id="notice-tabs">
     <div class="tab ${window._noticeState.tab==='active'?'active':''}" data-tab="active" onclick="switchListTab('notice','active')">效期內</div>
     <div class="tab ${window._noticeState.tab==='expired'?'active':''}" data-tab="expired" onclick="switchListTab('notice','expired')">逾期</div>
+    <div class="tab ${window._noticeState.tab==='missing'?'active':''}" data-tab="missing" onclick="switchListTab('notice','missing')" style="color:#856404">缺到期日</div>
     <div class="tab ${window._noticeState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('notice','all')">全部</div>
   </div>
   <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告" oninput="renderNoticeList()"></div>
@@ -473,6 +475,7 @@ function renderDutyList(){
     const expired=!missingExpiry&&d.expiryDate<today;
     if(st.tab==='active'&&(expired||missingExpiry))return false;
     if(st.tab==='expired'&&!expired)return false;
+    if(st.tab==='missing'&&!missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
     return true;
@@ -520,6 +523,7 @@ function renderNoticeList(){
     const expired=!missingExpiry&&d.expiryDate<today;
     if(st.tab==='active'&&(expired||missingExpiry))return false;
     if(st.tab==='expired'&&!expired)return false;
+    if(st.tab==='missing'&&!missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
     return true;
