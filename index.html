@@ -1161,7 +1161,7 @@ async function importFromSheets(){
         <table class="vtbl"><thead><tr><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
         <tbody>${newRows.map(p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;}).join('')}</tbody>
         </table></div>
-        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（缺分類辨識失敗、缺宣達者或缺發布日期）匯入時將自動略過，請於匯入後手動補登</div>
+        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空，請於匯入後至「勤前指示」頁面手動補登</div>
         <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入</button>`
       :'<div class="pholder">沒有新資料需要匯入</div>'}
     `;
@@ -1178,20 +1178,20 @@ async function confirmSheetsImport(){
   setBtnLoading(btn,'匯入中…');
   try{
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    let ok=0, skipped=0;
+    let ok=0, incomplete=0;
     for(const p of rows){
-      if(!p.category||!p.announcer||!p.issuedDate){skipped++;continue;}
+      if(!p.category||!p.announcer||!p.issuedDate) incomplete++;
       await addDoc(collection(window._db,'duty_briefs'),{
-        title:p.title, content:p.content, category:p.category, announcer:p.announcer,
-        unit:'', issuedDate:p.issuedDate, expiryDate:p.expiryDate||null,
+        title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
+        unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
         attachments:[], status:'active',
         createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
       });
       ok++;
     }
     setBtnSuccess(btn,'已匯入');
-    showToast(`已匯入 ${ok} 筆勤前指示${skipped?`，${skipped} 筆因欄位不全已略過`:''}`);
-    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已成功匯入 ${ok} 筆${skipped?`，${skipped} 筆因分類/宣達者/發布日期缺漏已略過，請於試算表補齊後重新連線比對`:''}</div>`;
+    showToast(`已匯入 ${ok} 筆勤前指示${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料，請自行補登`:''}`);
+    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已成功匯入 ${ok} 筆${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整匯入，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}</div>`;
   }catch(e){
     setBtnError(btn);
     showToast('匯入失敗：'+e.message);
