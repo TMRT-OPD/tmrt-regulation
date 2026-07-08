@@ -1114,7 +1114,8 @@ async function importFromSheets(){
     if(rows.length<2){area.innerHTML='<div class="pholder">試算表無資料</div>';return;}
     const headers=rows[0].map(h=>(h||'').trim());
     const idx=(aliases)=>headers.findIndex(h=>aliases.some(a=>h.includes(a)));
-    const iCat=idx(['分類','類別']);
+    let iCat=idx(['分類','類別']);
+    if(iCat<0) iCat=0; // 標題列若無「分類/類別」字樣，預設沿用第一欄（A欄）作為分類欄位
     const iContent=idx(['事項內容','內容','標題']);
     const iFrom=idx(['發布日期','生效日期']);
     const iTo=idx(['到期日期','失效日期']);
