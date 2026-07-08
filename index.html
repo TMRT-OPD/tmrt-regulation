@@ -385,6 +385,7 @@ const NOTICE_CATEGORIES=[
 ];
 function catBadge(cat){return cat?`<span class="cat-badge" style="background:${cat.bg};color:${cat.text}">${cat.name}</span>`:'<span class="cat-badge" style="background:#eee;color:#666">未分類</span>';}
 function expiredBadge(){return '<span class="cat-badge" style="background:#e9ecef;color:#495057">已逾期</span>';}
+function missingExpiryBadge(){return '<span class="cat-badge" style="background:#faeeda;color:#633806">⚠ 缺到期日，待確認</span>';}
 
 function renderFilterUI(kind,categories){
   const opts=categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
@@ -468,8 +469,9 @@ function renderDutyList(){
   const today=new Date().toISOString().slice(0,10);
   const kw=(document.getElementById('duty-search')?.value||'').trim().toLowerCase();
   let list=window._dutyDocs.filter(d=>{
-    const expired=!!(d.expiryDate&&d.expiryDate<today);
-    if(st.tab==='active'&&expired)return false;
+    const missingExpiry=!d.expiryDate;
+    const expired=!missingExpiry&&d.expiryDate<today;
+    if(st.tab==='active'&&(expired||missingExpiry))return false;
     if(st.tab==='expired'&&!expired)return false;
     if(st.category&&d.category!==st.category)return false;
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
@@ -479,10 +481,11 @@ function renderDutyList(){
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的勤前指示</div>';return;}
   area.innerHTML=list.map(d=>{
     const cat=DUTY_CATEGORIES.find(c=>c.id===d.category);
-    const expired=!!(d.expiryDate&&d.expiryDate<today);
-    return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${cat?cat.text:'#9e9e9a'}`}">
+    const missingExpiry=!d.expiryDate;
+    const expired=!missingExpiry&&d.expiryDate<today;
+    return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${missingExpiry?'#e0a72e':(cat?cat.text:'#9e9e9a')}`}">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        ${catBadge(cat)}${expired?expiredBadge():''}
+        ${catBadge(cat)}${expired?expiredBadge():''}${missingExpiry?missingExpiryBadge():''}
       </div>
       <div style="font-size:13px;font-weight:500">${d.title||'—'}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
@@ -513,8 +516,9 @@ function renderNoticeList(){
   const today=new Date().toISOString().slice(0,10);
   const kw=(document.getElementById('notice-search')?.value||'').trim().toLowerCase();
   let list=window._noticeDocs.filter(d=>{
-    const expired=!!(d.expiryDate&&d.expiryDate<today);
-    if(st.tab==='active'&&expired)return false;
+    const missingExpiry=!d.expiryDate;
+    const expired=!missingExpiry&&d.expiryDate<today;
+    if(st.tab==='active'&&(expired||missingExpiry))return false;
     if(st.tab==='expired'&&!expired)return false;
     if(st.category&&d.category!==st.category)return false;
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
@@ -524,10 +528,11 @@ function renderNoticeList(){
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的通告</div>';return;}
   area.innerHTML=list.map(d=>{
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
-    const expired=!!(d.expiryDate&&d.expiryDate<today);
-    return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${cat?cat.text:'#9e9e9a'}`}">
+    const missingExpiry=!d.expiryDate;
+    const expired=!missingExpiry&&d.expiryDate<today;
+    return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${missingExpiry?'#e0a72e':(cat?cat.text:'#9e9e9a')}`}">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        ${catBadge(cat)}${expired?expiredBadge():''}
+        ${catBadge(cat)}${expired?expiredBadge():''}${missingExpiry?missingExpiryBadge():''}
         ${d.extended?'<span class="tag tag-unrevised" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
