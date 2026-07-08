@@ -482,7 +482,7 @@ function renderDutyList(){
     const expired=!!(d.expiryDate&&d.expiryDate<today);
     return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${cat?cat.text:'#9e9e9a'}`}">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        ${expired?expiredBadge():catBadge(cat)}
+        ${catBadge(cat)}${expired?expiredBadge():''}
       </div>
       <div style="font-size:13px;font-weight:500">${d.title||'—'}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
@@ -527,7 +527,7 @@ function renderNoticeList(){
     const expired=!!(d.expiryDate&&d.expiryDate<today);
     return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${cat?cat.text:'#9e9e9a'}`}">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        ${expired?expiredBadge():catBadge(cat)}
+        ${catBadge(cat)}${expired?expiredBadge():''}
         ${d.extended?'<span class="tag tag-unrevised" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
@@ -1121,6 +1121,7 @@ async function importFromSheets(){
     const iTo=idx(['到期日期','失效日期']);
     const iAnn=idx(['宣達者','宣導者','宣導人']);
     if(iContent<0){area.innerHTML='<div class="pholder">找不到「事項內容」欄位，請確認試算表標題列</div>';return;}
+    const norm=s=>(s||'').replace(/\s+/g,'');
     const parsed=[];
     for(let r=1;r<rows.length;r++){
       const row=rows[r];
@@ -1129,8 +1130,10 @@ async function importFromSheets(){
       let title=rawContent.trim(),content='';
       const bm=rawContent.match(/【(.+?)】([\s\S]*)/);
       if(bm){title=bm[1].trim();content=bm[2].trim();}
+      if(!title)continue; // 合併儲存格造成的空白延伸列，非真實資料，直接略過
       const catText=((iCat>=0?row[iCat]:'')||'').trim();
-      const cat=DUTY_CATEGORIES.find(c=>catText.includes(c.name)||(catText&&c.name.includes(catText)));
+      const catNorm=norm(catText);
+      const cat=DUTY_CATEGORIES.find(c=>catNorm.includes(norm(c.name))||(catNorm&&norm(c.name).includes(catNorm)));
       parsed.push({
         title, content,
         category: cat?cat.id:'',
