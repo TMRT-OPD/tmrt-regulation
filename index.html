@@ -559,6 +559,7 @@ function renderNoticeList(){
 function pageRegUnit(p){
   const unitName = p ? p.split(' / ').pop() : '';
   const html = `<div class="ptitle">規章 — ${unitName}</div><div class="psub">${p||''}</div>
+  <div class="sb"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號或名稱" oninput="renderRegList()"></div>
   <div id="reg-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
   setTimeout(() => loadRegList(unitName), 0);
   return html;
@@ -603,48 +604,52 @@ async function loadRegList(unitName) {
   const area = document.getElementById('reg-list-area');
   if (!area) return;
   try {
-    const {collection, query, where, orderBy, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const q = query(
       collection(window._db, 'regulations'),
       where('dept', '==', unitName),
       where('status', '==', 'active')
     );
     const snap = await getDocs(q);
-    if (snap.empty) {
-      area.innerHTML = '<div class="pholder">此單位尚無規章資料</div>';
-      return;
-    }
-    const canEdit = window._level === 'S' || window._level === 'A';
-    let rows = '';
-    snap.forEach(doc => {
-      const d = doc.data();
-      const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
-      rows += `<tr>
-        <td><strong>${d.docNo||'—'}</strong></td>
-        <td>${d.title||'—'}</td>
-        <td><span class="badge" style="background:#e6f1fb;color:#0c447c">${tierLabels[d.tier]||'—'}</span></td>
-        <td>版次 ${d.version||'—'}</td>
-        <td>${d.approvedDate||'—'}</td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap">
-          ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 查閱</a>` : ''}
-          ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
-        </td>
-      </tr>`;
-    });
-    area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
-      <table class="vtbl">
-        <thead><tr><th>文件編號</th><th>文件名稱</th><th>位階</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    window._regListDocs = [];
+    snap.forEach(doc => window._regListDocs.push(doc.data()));
+    renderRegList();
   } catch(e) {
     area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
   }
 }
 
+function renderRegList(){
+  const area = document.getElementById('reg-list-area');
+  if (!area || !window._regListDocs) return;
+  const kw = (document.getElementById('reg-search')?.value||'').trim().toLowerCase();
+  const list = window._regListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.docNo||'').toLowerCase().includes(kw));
+  if (window._regListDocs.length === 0) { area.innerHTML = '<div class="pholder">此單位尚無規章資料</div>'; return; }
+  if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的規章</div>'; return; }
+  const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
+  const rows = list.map(d => `<tr>
+    <td><strong>${highlightText(d.docNo||'—',kw)}</strong></td>
+    <td>${highlightText(d.title||'—',kw)}</td>
+    <td><span class="badge" style="background:#e6f1fb;color:#0c447c">${tierLabels[d.tier]||'—'}</span></td>
+    <td>版次 ${d.version||'—'}</td>
+    <td>${d.approvedDate||'—'}</td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap">
+      ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 查閱</a>` : ''}
+      ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+    </td>
+  </tr>`).join('');
+  area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
+    <table class="vtbl">
+      <thead><tr><th>文件編號</th><th>文件名稱</th><th>位階</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
 function pageFormUnit(p){
   const unitName = p ? p.split(' / ').pop() : '';
   const html = `<div class="ptitle">表單 — ${unitName}</div><div class="psub">${p||''}</div>
+  <div class="sb"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號或名稱" oninput="renderFormList()"></div>
   <div id="form-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
   setTimeout(() => loadFormList(unitName), 0);
   return html;
@@ -661,32 +666,36 @@ async function loadFormList(unitName) {
       where('status', '==', 'active')
     );
     const snap = await getDocs(q);
-    if (snap.empty) {
-      area.innerHTML = '<div class="pholder">此單位尚無表單資料</div>';
-      return;
-    }
-    let rows = '';
-    snap.forEach(doc => {
-      const d = doc.data();
-      rows += `<tr>
-        <td><strong>${d.formNo||'—'}</strong></td>
-        <td>${d.title||'—'}</td>
-        <td>${d.approvedDate||'—'}</td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap">
-          ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-eye"></i> 查閱</a>` : ''}
-          ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
-        </td>
-      </tr>`;
-    });
-    area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
-      <table class="vtbl">
-        <thead><tr><th>表單編號</th><th>表單名稱</th><th>核決日期</th><th>操作</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    window._formListDocs = [];
+    snap.forEach(doc => window._formListDocs.push(doc.data()));
+    renderFormList();
   } catch(e) {
     area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
   }
+}
+
+function renderFormList(){
+  const area = document.getElementById('form-list-area');
+  if (!area || !window._formListDocs) return;
+  const kw = (document.getElementById('form-search')?.value||'').trim().toLowerCase();
+  const list = window._formListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.formNo||'').toLowerCase().includes(kw));
+  if (window._formListDocs.length === 0) { area.innerHTML = '<div class="pholder">此單位尚無表單資料</div>'; return; }
+  if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的表單</div>'; return; }
+  const rows = list.map(d => `<tr>
+    <td><strong>${highlightText(d.formNo||'—',kw)}</strong></td>
+    <td>${highlightText(d.title||'—',kw)}</td>
+    <td>${d.approvedDate||'—'}</td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap">
+      ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-eye"></i> 查閱</a>` : ''}
+      ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+    </td>
+  </tr>`).join('');
+  area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
+    <table class="vtbl">
+      <thead><tr><th>表單編號</th><th>表單名稱</th><th>核決日期</th><th>操作</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上傳</div><div class="psub">新增勤前指示或從 Google Sheets 批次匯入</div>
