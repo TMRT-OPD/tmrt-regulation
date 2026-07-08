@@ -1149,21 +1149,30 @@ async function importFromSheets(){
     if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
     const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const snap=await getDocs(collection(window._db,'duty_briefs'));
-    const existKeys=new Set();
-    snap.forEach(doc=>{const d=doc.data();existKeys.add((d.title||'')+'|'+(d.issuedDate||''));});
-    parsed.forEach(p=>{p._dup=existKeys.has(p.title+'|'+p.issuedDate);});
-    const newRows=parsed.filter(p=>!p._dup);
-    const dupCount=parsed.length-newRows.length;
-    window._sheetsImportRows=newRows;
+    const existMap=new Map();
+    snap.forEach(doc=>{const d=doc.data();existMap.set((d.title||'')+'|'+(d.issuedDate||''),{id:doc.id,data:d});});
+    const FIELDS_TO_COMPARE=[['category','分類'],['announcer','宣達者'],['expiryDate','到期日期'],['content','內容']];
+    parsed.forEach(p=>{
+      const key=p.title+'|'+p.issuedDate;
+      const existing=existMap.get(key);
+      if(!existing){p._status='new';return;}
+      const changed=FIELDS_TO_COMPARE.filter(([f])=>String(p[f]||'')!==String(existing.data[f]||'')).map(([,label])=>label);
+      if(changed.length===0){p._status='dup';}
+      else{p._status='update';p._docId=existing.id;p._changed=changed;}
+    });
+    const newRows=parsed.filter(p=>p._status==='new');
+    const updateRows=parsed.filter(p=>p._status==='update');
+    const dupCount=parsed.filter(p=>p._status==='dup').length;
+    const renderRow=p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
     area.innerHTML=`
-      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆已存在（略過），${newRows.length} 筆為新資料</div>
-      ${newRows.length?`<div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（將更新）、${newRows.length} 筆為全新資料</div>
+      ${(newRows.length+updateRows.length)?`<div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
         <table class="vtbl"><thead><tr><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
-        <tbody>${newRows.map(p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;}).join('')}</tbody>
+        <tbody>${newRows.map(renderRow).join('')}${updateRows.map(renderRow).join('')}</tbody>
         </table></div>
-        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空，請於匯入後至「勤前指示」頁面手動補登</div>
-        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入</button>`
-      :'<div class="pholder">沒有新資料需要匯入</div>'}
+        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空；標記黃字（異動：⋯）表示此筆在資料庫中已存在但內容有變動，確認後將直接更新既有資料，不會產生重複</div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入（新增 ${newRows.length}／更新 ${updateRows.length}）</button>`
+      :'<div class="pholder">沒有新資料或異動需要處理</div>'}
     `;
   }catch(e){
     area.innerHTML=`<div class="pholder">連線失敗：${e.message}</div>`;
@@ -1175,26 +1184,35 @@ async function confirmSheetsImport(){
   if(rows.length===0)return;
   const area=document.getElementById('sheets-preview-area');
   const btn=area.querySelector('.btn-primary');
-  setBtnLoading(btn,'匯入中…');
+  setBtnLoading(btn,'處理中…');
   try{
-    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    let ok=0, incomplete=0;
+    const {collection, addDoc, doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    let added=0, updated=0, incomplete=0;
     for(const p of rows){
       if(!p.category||!p.announcer||!p.issuedDate) incomplete++;
-      await addDoc(collection(window._db,'duty_briefs'),{
-        title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
-        unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
-        attachments:[], status:'active',
-        createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
-      });
-      ok++;
+      if(p._status==='update'){
+        await updateDoc(doc(window._db,'duty_briefs',p._docId),{
+          category:p.category||'', announcer:p.announcer||'',
+          expiryDate:p.expiryDate||null, content:p.content||'',
+          updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
+        });
+        updated++;
+      } else {
+        await addDoc(collection(window._db,'duty_briefs'),{
+          title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
+          unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
+          attachments:[], status:'active',
+          createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
+        });
+        added++;
+      }
     }
-    setBtnSuccess(btn,'已匯入');
-    showToast(`已匯入 ${ok} 筆勤前指示${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料，請自行補登`:''}`);
-    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已成功匯入 ${ok} 筆${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整匯入，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}</div>`;
+    setBtnSuccess(btn,'已完成');
+    showToast(`新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料`:''}`);
+    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已完成：新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整處理，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}</div>`;
   }catch(e){
     setBtnError(btn);
-    showToast('匯入失敗：'+e.message);
+    showToast('處理失敗：'+e.message);
   }
 }
 function doReviseSearch(){showToast("比對功能開發中");}
