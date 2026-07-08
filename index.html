@@ -147,6 +147,8 @@ textarea{resize:vertical;min-height:80px}
     <div class="nsec">規章</div>
     <div class="ni" onclick="toggleSub('sub-reg',this)"><i class="ti ti-folders"></i>規章<i class="ti ti-chevron-right na"></i></div>
     <div class="nc" id="sub-reg"></div>
+    <div class="ni" onclick="toggleSub('sub-form',this)"><i class="ti ti-file-text"></i>表單<i class="ti ti-chevron-right na"></i></div>
+    <div class="nc" id="sub-form"></div>
     <div class="ni" onclick="openChangePwd()"><i class="ti ti-key"></i>修改密碼</div>
     <div class="nsec" id="nsec-admin" style="display:none">後臺</div>
     <div class="ni" id="ni-admin" onclick="toggleSub('sub-admin',this)" style="display:none"><i class="ti ti-settings"></i>後臺控管<i class="ti ti-chevron-right na"></i></div>
@@ -154,6 +156,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" onclick="gp('admin-upload-duty',this)">勤前上傳</div>
       <div class="nch" onclick="gp('admin-upload-notice',this)">通告上傳</div>
       <div class="nch" onclick="gp('admin-upload-reg',this)">規章上傳</div>
+      <div class="nch" onclick="gp('admin-upload-form',this)">表單上傳</div>
       <div class="nch" onclick="gp('admin-revise',this)">規章修訂比對</div>
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
@@ -218,8 +221,9 @@ const regTree={
   "維修處(MAD)":{"車輛廠RSP":{"DEQ機廠設備":null,"EMU電聯車":null,"GEN共通":null},"軌道土木廠TCP":{"CVC土建":null,"CVH工程車":null,"DEQ機廠設備":null,"GEN共通":null,"TKM軌道":null},"電子廠ELP":{"COM通訊系統":null,"GEN共通性":null,"OCS號誌系統":null},"電機廠EMP":{"FFS消防系統":{"AFE自動氣體滅火系統":null,"FA消防警報系統":null,"FW消防水系統":null,"OT其他":null},"GEN共通":{"MN管理":null},"PWR電力系統":{"BSS主變電站":null,"FPSS設備變電站":null,"OT其他":null,"PPSS牽引動力變電站":null,"PRC電力遙控系統":null,"WSE道旁設備":null},"SME車站設備":{"ACS空調系統":null,"ELV電梯":null,"ESC電扶梯":null}},"維修處MAD":{"DEQ機廠設備":null,"GEN共通":{"MN管理":null,"OT其他":null,"SF安全":null}}}
 };
 
-function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'');}
-function buildBranch(node,container,path){for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s';t.appendChild(document.createTextNode(key));t.appendChild(ic);const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';t.onclick=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};buildBranch(ch,s,fp);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp('reg-unit',it,fp);container.appendChild(it)}}}
+function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','reg-unit');}
+function buildFormTree(){const c=document.getElementById('sub-form');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','form-unit');}
+function buildBranch(node,container,path,pageKey){pageKey=pageKey||'reg-unit';for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s';t.appendChild(document.createTextNode(key));t.appendChild(ic);const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';t.onclick=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};buildBranch(ch,s,fp,pageKey);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp(pageKey,it,fp);container.appendChild(it)}}}
 
 function toggleSub(id,el){const s=document.getElementById(id);if(!s)return;const o=s.style.display==='block';s.style.display=o?'none':'block';const a=el.querySelector('.na');if(a)a.style.transform=o?'':'rotate(90deg)'}
 
@@ -231,8 +235,9 @@ function gp(key,el,param){
     readme:pageReadme,search:pageSearch,
     duty:pageDuty,notice:pageNotice,
     'reg-unit':()=>pageRegUnit(param),
+    'form-unit':()=>pageFormUnit(param),
     'admin-upload-duty':pageUploadDuty,'admin-upload-notice':pageUploadNotice,
-    'admin-upload-reg':pageUploadReg,'admin-revise':pageRevise,'admin-perm':pagePerm
+    'admin-upload-reg':pageUploadReg,'admin-upload-form':pageUploadForm,'admin-revise':pageRevise,'admin-perm':pagePerm
   };
   r.innerHTML=(map[key]||(()=>'<div class="pholder">頁面開發中</div>'))();
   if(key==='admin-perm') initPermPage();
@@ -240,6 +245,7 @@ function gp(key,el,param){
   if(key==='duty') setTimeout(loadDutyList, 0);
   if(key==='notice') setTimeout(loadNoticeList, 0);
   if(key==='admin-upload-reg') initDropZone('reg-drop-zone','rfs','rfl');
+  if(key==='admin-upload-form') initDropZone('form-drop-zone','ffs','ffl');
   if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); }
   if(key==='admin-upload-notice') initDropZone('notice-drop-zone','nfs','nfl');
 }
@@ -618,6 +624,53 @@ async function loadRegList(unitName) {
   }
 }
 
+function pageFormUnit(p){
+  const unitName = p ? p.split(' / ').pop() : '';
+  const html = `<div class="ptitle">表單 — ${unitName}</div><div class="psub">${p||''}</div>
+  <div id="form-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
+  setTimeout(() => loadFormList(unitName), 0);
+  return html;
+}
+
+async function loadFormList(unitName) {
+  const area = document.getElementById('form-list-area');
+  if (!area) return;
+  try {
+    const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const q = query(
+      collection(window._db, 'forms'),
+      where('dept', '==', unitName),
+      where('status', '==', 'active')
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      area.innerHTML = '<div class="pholder">此單位尚無表單資料</div>';
+      return;
+    }
+    let rows = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      rows += `<tr>
+        <td><strong>${d.formNo||'—'}</strong></td>
+        <td>${d.title||'—'}</td>
+        <td>${d.approvedDate||'—'}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-eye"></i> 查閱</a>` : ''}
+          ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+        </td>
+      </tr>`;
+    });
+    area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
+      <table class="vtbl">
+        <thead><tr><th>表單編號</th><th>表單名稱</th><th>核決日期</th><th>操作</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
+  }
+}
+
 function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上傳</div><div class="psub">新增勤前指示或從 Google Sheets 批次匯入</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'td-m')">手動新增</div><div class="tab" onclick="switchTab(this,'td-s')">從 Google Sheets 匯入</div></div>
 <div class="tabpane active" id="td-m"><div class="card">
@@ -633,11 +686,12 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
   <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveDuty()"><i class="ti ti-check"></i> 儲存</button><button class="btn" onclick="clearForm(['dt','du','dc'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="td-s"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>系統可直接連線您的 Google Sheets 勤前指示總表，比對後將新資料批次匯入 Firestore</div>
-  <div style="margin-bottom:12px"><label class="fl2">Google Sheets 網址</label><input type="text" placeholder="請貼上試算表網址"></div>
-  <div style="margin-bottom:12px"><label class="fl2">工作表名稱（選填）</label><input type="text" placeholder="預設讀取第一個工作表"></div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>系統可直接連線您的 Google Sheets 勤前指示總表，比對後將新資料批次匯入 Firestore。試算表標題列請包含：分類、事項內容（可用【標題】內文格式）、發布日期、到期日期、宣達者</div>
+  <div style="margin-bottom:12px"><label class="fl2">Google Sheets 網址</label><input type="text" id="dsu" placeholder="請貼上試算表網址"></div>
+  <div style="margin-bottom:12px"><label class="fl2">工作表名稱（選填）</label><input type="text" id="dsn" placeholder="預設讀取第一個工作表"></div>
   <div class="warn-box"><i class="ti ti-alert-triangle"></i>請確認試算表已設為「知道連結的人可以檢視」</div>
-  <button class="btn btn-primary" onclick="importFromSheets()"><i class="ti ti-table-import"></i> 連線並預覽</button>
+  <button class="btn btn-primary" onclick="importFromSheets()"><i class="ti ti-table-import"></i> 連線比對並預覽</button>
+  <div id="sheets-preview-area" style="margin-top:14px"></div>
 </div></div>`;}
 
 function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告上傳</div><div class="psub">發布通告，將列入效期內通告頁面</div>
@@ -674,6 +728,21 @@ function pageUploadReg(){return`<div class="ptitle">後臺控管 — 規章上�
     <div class="file-list" id="rfl"></div></div>
   <div class="info-box"><i class="ti ti-info-circle"></i>上傳後系統將自動擷取文字建立關鍵字索引，並保留舊版本供查詢</div>
   <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveReg()"><i class="ti ti-check"></i> 上傳規章</button><button class="btn" onclick="clearForm(['rd','rt','rv','rp'])"><i class="ti ti-refresh"></i> 清除</button></div>
+</div>`;}
+
+function pageUploadForm(){return`<div class="ptitle">後臺控管 — 表單上傳</div><div class="psub">上傳表單檔案，比照規章分類至各處室/廠別/系統別</div>
+<div class="card">
+  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">表單編號（選填）</label><input type="text" id="fd" placeholder="例：TMRT-SOC-OPD-4-1001"></div><div><label class="fl2">表單名稱 *</label><input type="text" id="ft" placeholder="請輸入表單名稱"></div></div>
+  <div class="fg2" style="margin-bottom:12px">
+    <div><label class="fl2">所屬處室</label><select id="fdept"><option value="">請選擇</option><option>運務處(OPD)</option><option>維修處(MAD)</option><option>人力資源處(HRD)</option><option>工安處(ISD)</option><option>企劃處(PLD)</option><option>行政處(ADD)</option><option>財會處(FAD)</option><option>副總經理室(VPO)</option><option>資訊處(IMD)</option></select></div>
+    <div><label class="fl2">核決日期</label><input type="date" id="fdate"></div>
+  </div>
+  <div style="margin-bottom:12px"><label class="fl2">表單檔案（支援 PDF、Word、Excel）*</label>
+    <div id="form-drop-zone" class="upload-zone" onclick="document.getElementById('ffs').click()"><i class="ti ti-upload"></i><span>點擊選取或將檔案拖曳至此處</span></div>
+    <input type="file" id="ffs" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="showFiles(this,'ffl')">
+    <div class="file-list" id="ffl"></div></div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>儲存後將同步至 Firestore，於左側「表單」樹狀結構對應處室下即可查閱</div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveForm()"><i class="ti ti-check"></i> 上傳表單</button><button class="btn" onclick="clearForm(['fd','ft'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div>`;}
 
 function pageRevise(){return`<div class="ptitle">後臺控管 — 規章修訂比對</div><div class="psub">輸入關鍵字，系統自動比對所有規章，避免修訂時掛一漏萬</div>
@@ -923,6 +992,39 @@ async function saveReg() {
   }
 }
 
+async function saveForm() {
+  const title = document.getElementById('ft')?.value?.trim();
+  const fileInput = document.getElementById('ffs');
+  if (!title) { showToast('請輸入表單名稱'); return; }
+  if (!fileInput || fileInput.files.length === 0) { showToast('請選取表單檔案'); return; }
+  const btn = document.querySelector('#form-drop-zone')?.closest('.card')?.querySelector('.btn-primary') || document.querySelector('.btn-primary');
+  setBtnLoading(btn, '上傳中…');
+  try {
+    const file = fileInput.files[0];
+    const dept = document.getElementById('fdept')?.value || '';
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const fileUrl = await uploadFile(file, `forms/${dept||'unassigned'}/${Date.now()}_${file.name}`);
+    await addDoc(collection(window._db, 'forms'), {
+      title,
+      formNo: document.getElementById('fd')?.value || '',
+      dept,
+      approvedDate: document.getElementById('fdate')?.value || '',
+      fileUrl, fileName: file.name, fileSize: file.size,
+      status: 'active',
+      createdAt: serverTimestamp(), uploadedBy: window._uid
+    });
+    setBtnSuccess(btn, '上傳成功');
+    showToast('表單已上傳');
+    ['fd','ft'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const fdateEl = document.getElementById('fdate'); if (fdateEl) fdateEl.value = '';
+    const fl = document.getElementById('ffl'); if (fl) fl.innerHTML = '';
+  } catch(e) {
+    setBtnError(btn);
+    showToast('上傳失敗：' + e.message);
+    console.error(e);
+  }
+}
+
 // ===== 拖曳上傳 =====
 function initDropZone(zoneId, inputId, listId) {
   const zone = document.getElementById(zoneId);
@@ -964,7 +1066,130 @@ function setBtnError(btn) {
   btn.disabled = false;
 }
 
-function importFromSheets(){showToast("Google Sheets 連線功能開發中");}
+function parseCSV(text){
+  const rows=[];let row=[];let field='';let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else {inQuotes=false;} }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){row.push(field);field='';}
+      else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
+      else if(c==='\r'){/*skip*/}
+      else field+=c;
+    }
+  }
+  if(field.length||row.length){row.push(field);rows.push(row);}
+  return rows;
+}
+
+function parseMinguoDate(s){
+  if(!s)return '';
+  s=String(s).trim();
+  if(!s)return '';
+  const m=s.match(/^(\d{2,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if(!m)return s;
+  let y=parseInt(m[1]),mo=m[2].padStart(2,'0'),d=m[3].padStart(2,'0');
+  if(y<1000) y+=1911;
+  return `${y}-${mo}-${d}`;
+}
+
+async function importFromSheets(){
+  const urlInput=document.getElementById('dsu')?.value?.trim();
+  const sheetName=document.getElementById('dsn')?.value?.trim();
+  const area=document.getElementById('sheets-preview-area');
+  if(!urlInput){showToast('請貼上 Google Sheets 網址');return;}
+  const m=urlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(!m){showToast('網址格式不正確，請貼上完整的 Google Sheets 網址');return;}
+  const sheetId=m[1];
+  const csvUrl=`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${sheetName?('&sheet='+encodeURIComponent(sheetName)):''}`;
+  area.innerHTML='<div class="pholder">連線中…</div>';
+  try{
+    const res=await fetch(csvUrl);
+    if(!res.ok) throw new Error('無法讀取試算表，請確認已設為「知道連結的人可以檢視」');
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(rows.length<2){area.innerHTML='<div class="pholder">試算表無資料</div>';return;}
+    const headers=rows[0].map(h=>(h||'').trim());
+    const idx=(aliases)=>headers.findIndex(h=>aliases.some(a=>h.includes(a)));
+    const iCat=idx(['分類','類別']);
+    const iContent=idx(['事項內容','內容','標題']);
+    const iFrom=idx(['發布日期','生效日期']);
+    const iTo=idx(['到期日期','失效日期']);
+    const iAnn=idx(['宣達者','宣導者','宣導人']);
+    if(iContent<0){area.innerHTML='<div class="pholder">找不到「事項內容」欄位，請確認試算表標題列</div>';return;}
+    const parsed=[];
+    for(let r=1;r<rows.length;r++){
+      const row=rows[r];
+      if(!row||row.every(c=>!c||!c.trim()))continue;
+      const rawContent=(iContent>=0?row[iContent]:'')||'';
+      let title=rawContent.trim(),content='';
+      const bm=rawContent.match(/【(.+?)】([\s\S]*)/);
+      if(bm){title=bm[1].trim();content=bm[2].trim();}
+      const catText=((iCat>=0?row[iCat]:'')||'').trim();
+      const cat=DUTY_CATEGORIES.find(c=>catText.includes(c.name)||(catText&&c.name.includes(catText)));
+      parsed.push({
+        title, content,
+        category: cat?cat.id:'',
+        categoryText: catText,
+        issuedDate: parseMinguoDate(iFrom>=0?row[iFrom]:''),
+        expiryDate: parseMinguoDate(iTo>=0?row[iTo]:''),
+        announcer: ((iAnn>=0?row[iAnn]:'')||'').trim()
+      });
+    }
+    if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
+    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap=await getDocs(collection(window._db,'duty_briefs'));
+    const existKeys=new Set();
+    snap.forEach(doc=>{const d=doc.data();existKeys.add((d.title||'')+'|'+(d.issuedDate||''));});
+    parsed.forEach(p=>{p._dup=existKeys.has(p.title+'|'+p.issuedDate);});
+    const newRows=parsed.filter(p=>!p._dup);
+    const dupCount=parsed.length-newRows.length;
+    window._sheetsImportRows=newRows;
+    area.innerHTML=`
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆已存在（略過），${newRows.length} 筆為新資料</div>
+      ${newRows.length?`<div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
+        <table class="vtbl"><thead><tr><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
+        <tbody>${newRows.map(p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;}).join('')}</tbody>
+        </table></div>
+        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（缺分類辨識失敗、缺宣達者或缺發布日期）匯入時將自動略過，請於匯入後手動補登</div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入</button>`
+      :'<div class="pholder">沒有新資料需要匯入</div>'}
+    `;
+  }catch(e){
+    area.innerHTML=`<div class="pholder">連線失敗：${e.message}</div>`;
+  }
+}
+
+async function confirmSheetsImport(){
+  const rows=window._sheetsImportRows||[];
+  if(rows.length===0)return;
+  const area=document.getElementById('sheets-preview-area');
+  const btn=area.querySelector('.btn-primary');
+  setBtnLoading(btn,'匯入中…');
+  try{
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    let ok=0, skipped=0;
+    for(const p of rows){
+      if(!p.category||!p.announcer||!p.issuedDate){skipped++;continue;}
+      await addDoc(collection(window._db,'duty_briefs'),{
+        title:p.title, content:p.content, category:p.category, announcer:p.announcer,
+        unit:'', issuedDate:p.issuedDate, expiryDate:p.expiryDate||null,
+        attachments:[], status:'active',
+        createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
+      });
+      ok++;
+    }
+    setBtnSuccess(btn,'已匯入');
+    showToast(`已匯入 ${ok} 筆勤前指示${skipped?`，${skipped} 筆因欄位不全已略過`:''}`);
+    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已成功匯入 ${ok} 筆${skipped?`，${skipped} 筆因分類/宣達者/發布日期缺漏已略過，請於試算表補齊後重新連線比對`:''}</div>`;
+  }catch(e){
+    setBtnError(btn);
+    showToast('匯入失敗：'+e.message);
+  }
+}
 function doReviseSearch(){showToast("比對功能開發中");}
 function toggleEye(){const i=document.getElementById('l-pwd'),ic=document.getElementById('eye-icon');if(i.type==='password'){i.type='text';ic.className='ti ti-eye-off';}else{i.type='password';ic.className='ti ti-eye';}}
 document.addEventListener('DOMContentLoaded',()=>{document.getElementById('l-acc').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-pwd').focus()});document.getElementById('l-pwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});}); 
@@ -999,6 +1224,7 @@ onAuthStateChanged(auth,async(user)=>{
     if(level==='S'||level==='A'){document.getElementById('nsec-admin').style.display='';document.getElementById('ni-admin').style.display='flex';document.getElementById('sub-admin').style.display='none';}
     if(level==='S'){document.getElementById('nch-perm').style.display='';}
     buildRegTree();
+    buildFormTree();
     gp('readme',document.querySelector('.ni'));
   }else{
     document.getElementById('login-screen').style.display='flex';
