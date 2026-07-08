@@ -159,6 +159,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" onclick="gp('admin-upload-reg',this)">規章上傳</div>
       <div class="nch" onclick="gp('admin-upload-form',this)">表單上傳</div>
       <div class="nch" onclick="gp('admin-revise',this)">規章修訂比對</div>
+      <div class="nch" onclick="gp('admin-pdf-test',this)">PDF文字擷取測試</div>
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
@@ -238,7 +239,7 @@ function gp(key,el,param){
     'reg-unit':()=>pageRegUnit(param),
     'form-unit':()=>pageFormUnit(param),
     'admin-upload-duty':pageUploadDuty,'admin-upload-notice':pageUploadNotice,
-    'admin-upload-reg':pageUploadReg,'admin-upload-form':pageUploadForm,'admin-revise':pageRevise,'admin-perm':pagePerm
+    'admin-upload-reg':pageUploadReg,'admin-upload-form':pageUploadForm,'admin-revise':pageRevise,'admin-perm':pagePerm,'admin-pdf-test':pagePdfTest
   };
   r.innerHTML=(map[key]||(()=>'<div class="pholder">頁面開發中</div>'))();
   if(key==='admin-perm') initPermPage();
@@ -1419,6 +1420,50 @@ async function confirmNoticeBatchUpload(){
   } catch(e) {
     setBtnError(btn);
     showToast('批次上傳失敗：'+e.message);
+  }
+}
+
+function pagePdfTest(){return`<div class="ptitle">後臺控管 — PDF文字擷取測試</div><div class="psub">測試PDF能否被正確讀取文字，並檢查系統實際擷取到的文字順序，用來確認/調整自動辨識規則</div>
+<div class="card">
+  <div style="margin-bottom:12px"><label class="fl2">選擇PDF測試</label>
+    <div id="pdftest-drop-zone" class="upload-zone" onclick="document.getElementById('pdftest-fs').click()"><i class="ti ti-file-type-pdf"></i><span>點擊選取PDF檔案（不會上傳，僅本機測試）</span></div>
+    <input type="file" id="pdftest-fs" accept=".pdf" style="display:none" onchange="testExtractPdf(this)">
+  </div>
+  <div id="pdftest-result"></div>
+</div>`;}
+
+async function testExtractPdf(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const area = document.getElementById('pdftest-result');
+  area.innerHTML = '<div class="pholder">正在擷取中…</div>';
+  try {
+    const {text, numPages, extractedPages, truncated} = await extractPdfText(file, 500, (i,n,total)=>{
+      area.innerHTML = `<div class="pholder">正在擷取中…(第 ${i}/${n} 頁${total>n?`，共${total}頁`:''})</div>`;
+    });
+    const meta = extractDocMetaFromText(text, file.name);
+    const charCount = text.replace(/\s/g,'').length;
+    area.innerHTML = `
+      <div class="info-box"><i class="ti ti-info-circle"></i>檔案共 ${numPages} 頁，擷取了前 ${extractedPages} 頁${truncated?'（已達500頁上限，未完整擷取）':''}，共擷取到 ${charCount} 個非空白字元${charCount===0?'　<span style="color:#E24B4A">（很可能是掃描件，沒有文字圖層）</span>':''}</div>
+      <div class="card">
+        <div class="card-title">自動辨識結果（用來確認正則規則抓不抓得到）</div>
+        <table class="vtbl">
+          <tbody>
+            <tr><td style="width:120px">文件編號</td><td>${meta.docNo||'<span style="color:#E24B4A">未辨識</span>'}</td></tr>
+            <tr><td>文件名稱</td><td>${meta.title||'<span style="color:#E24B4A">未辨識</span>'}</td></tr>
+            <tr><td>所屬處室</td><td>${meta.dept||'<span style="color:#E24B4A">未辨識</span>'}</td></tr>
+            <tr><td>版次</td><td>${meta.version||'<span style="color:#E24B4A">未辨識</span>'}</td></tr>
+            <tr><td>核決日期</td><td>${meta.approvedDate||'<span style="color:#E24B4A">未辨識</span>'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">系統實際擷取到的原始文字（前 3000 字，可複製貼給開發者比對順序）</div>
+        <textarea readonly style="min-height:240px;font-family:monospace;font-size:11px">${escapeHtml(text.slice(0,3000))}</textarea>
+      </div>
+    `;
+  } catch(e) {
+    area.innerHTML = `<div class="pholder">擷取失敗：${e.message}</div>`;
   }
 }
 
