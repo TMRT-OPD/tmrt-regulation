@@ -1193,28 +1193,37 @@ async function confirmSheetsImport(){
   if(rows.length===0)return;
   const area=document.getElementById('sheets-preview-area');
   const btn=area.querySelector('.btn-primary');
-  setBtnLoading(btn,'處理中…');
+  setBtnLoading(btn,`處理中…(0/${rows.length})`);
   try{
-    const {collection, addDoc, doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    let added=0, updated=0, incomplete=0;
-    for(const p of rows){
-      if(!p.category||!p.announcer||!p.issuedDate) incomplete++;
-      if(p._status==='update'){
-        await updateDoc(doc(window._db,'duty_briefs',p._docId),{
-          category:p.category||'', announcer:p.announcer||'',
-          expiryDate:p.expiryDate||null, content:p.content||'',
-          updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
-        });
-        updated++;
-      } else {
-        await addDoc(collection(window._db,'duty_briefs'),{
-          title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
-          unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
-          attachments:[], status:'active',
-          createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
-        });
-        added++;
+    const {collection, doc, writeBatch, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    let added=0, updated=0, incomplete=0, done=0;
+    const CHUNK=400; // 低於 Firestore 單一 batch 500 筆上限，保留餘裕
+    for(let i=0;i<rows.length;i+=CHUNK){
+      const chunk=rows.slice(i,i+CHUNK);
+      const batch=writeBatch(window._db);
+      for(const p of chunk){
+        if(!p.category||!p.announcer||!p.issuedDate) incomplete++;
+        if(p._status==='update'){
+          batch.update(doc(window._db,'duty_briefs',p._docId),{
+            category:p.category||'', announcer:p.announcer||'',
+            expiryDate:p.expiryDate||null, content:p.content||'',
+            updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
+          });
+          updated++;
+        } else {
+          const ref=doc(collection(window._db,'duty_briefs'));
+          batch.set(ref,{
+            title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
+            unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
+            attachments:[], status:'active',
+            createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
+          });
+          added++;
+        }
       }
+      await batch.commit();
+      done+=chunk.length;
+      if(btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 處理中…(${done}/${rows.length})`;
     }
     setBtnSuccess(btn,'已完成');
     showToast(`新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料`:''}`);
