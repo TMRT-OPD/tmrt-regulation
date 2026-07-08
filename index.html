@@ -1172,6 +1172,7 @@ async function importFromSheets(){
     const newRows=parsed.filter(p=>p._status==='new');
     const updateRows=parsed.filter(p=>p._status==='update');
     const dupCount=parsed.filter(p=>p._status==='dup').length;
+    window._sheetsImportRows=[...newRows,...updateRows];
     const renderRow=p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
     area.innerHTML=`
       <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（將更新）、${newRows.length} 筆為全新資料</div>
