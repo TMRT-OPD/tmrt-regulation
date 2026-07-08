@@ -107,6 +107,7 @@ textarea{resize:vertical;min-height:80px}
 .filter-select{width:auto;min-width:160px}
 .list-card{background:var(--cp);border:0.5px solid var(--bt);border-radius:var(--rl);padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--bs)}
 .list-card.expired{background:#f8f9fa;border-left-color:#adb5bd}
+.kw-hl{background:#fff3a0;color:#1a1a18;padding:0 1px;border-radius:2px;font-weight:600}
 .upload-progress{height:4px;background:var(--cs);border-radius:2px;margin-top:10px;overflow:hidden;display:none}
 .upload-progress-bar{height:100%;background:#378ADD;border-radius:2px;width:0%;transition:width .3s}
 .btn-success-temp{background:#1D9E75!important;border-color:#1D9E75!important}
@@ -383,6 +384,14 @@ const NOTICE_CATEGORIES=[
   {id:'ext_hq',name:'外單位通告－處本部',bg:'#e2d9f3',text:'#3c2a6e'},
   {id:'ext_maint',name:'外單位通告－維修處',bg:'#e2d9f3',text:'#3c2a6e'}
 ];
+function escapeHtml(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function highlightText(text,kw){
+  const escaped=escapeHtml(text);
+  if(!kw)return escaped;
+  const re=new RegExp(escapeRegex(escapeHtml(kw)),'gi');
+  return escaped.replace(re,m=>`<mark class="kw-hl">${m}</mark>`);
+}
 function catBadge(cat){return cat?`<span class="cat-badge" style="background:${cat.bg};color:${cat.text}">${cat.name}</span>`:'<span class="cat-badge" style="background:#eee;color:#666">未分類</span>';}
 function expiredBadge(){return '<span class="cat-badge" style="background:#e9ecef;color:#495057">已逾期</span>';}
 function missingExpiryBadge(){return '<span class="cat-badge" style="background:#faeeda;color:#633806">⚠ 缺到期日，待確認</span>';}
@@ -490,9 +499,9 @@ function renderDutyList(){
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
         ${catBadge(cat)}${expired?expiredBadge():''}${missingExpiry?missingExpiryBadge():''}
       </div>
-      <div style="font-size:13px;font-weight:500">${d.title||'—'}</div>
+      <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${d.content}</div>`:''}
+      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
     </div>`;
   }).join('');
@@ -540,9 +549,9 @@ function renderNoticeList(){
         ${d.extended?'<span class="tag tag-unrevised" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
-      <div style="font-size:13px;font-weight:500">${d.title||'—'}</div>
+      <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${d.content}</div>`:''}
+      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
     </div>`;
   }).join('');
