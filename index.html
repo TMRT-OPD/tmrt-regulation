@@ -1149,11 +1149,12 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId)
   if (titleEl) titleEl.textContent = title || '內文';
   if (body) {
     const pdfLink = fileUrl ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
+    const canReextract = collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
+    const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
     if (!fullText || !fullText.trim()) {
-      const canReextract = collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
-      body.innerHTML = `${pdfLink}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${canReextract?`<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> 從原始檔案重新擷取全文</button>`:''}`;
+      body.innerHTML = `${pdfLink}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${reextractBtn}`;
     } else {
-      body.innerHTML = `${pdfLink}<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.8;color:var(--tp);max-height:60vh;overflow-y:auto;padding:4px;border:0.5px solid var(--bt);border-radius:var(--rm)">${escapeHtml(fullText)}</div>`;
+      body.innerHTML = `${pdfLink}<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.8;color:var(--tp);max-height:60vh;overflow-y:auto;padding:4px;border:0.5px solid var(--bt);border-radius:var(--rm)">${escapeHtml(fullText)}</div>${reextractBtn}`;
     }
   }
   document.getElementById('modal-viewtext').classList.add('open');
