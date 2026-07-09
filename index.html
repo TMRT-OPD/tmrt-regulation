@@ -1788,7 +1788,10 @@ async function extractPdfText(file, maxPages, onProgress){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
   // 條列／條號開頭樣式：不管行距大小，只要新行開頭符合這些格式，一律視為新行（法規文件常見的條列結構）
-  const clauseStartPattern = /^([一二三四五六七八九十0-9１-９]{1,3}[、.．]|[（(][一二三四五六七八九十0-9]{1,3}[）)]|\d+(\.\d+){1,4}[\s、]|第[一二三四五六七八九十0-9]+[條章節款項])/;
+  // 依公司「公司規則格式編碼注意事項」(TMRT-HRD-GEN-0-3002) 規範的所有合法編號樣式：
+  // 純數字章節(1 目的)、多層小數點(5.1、5.1.1)、中文數字頓號(一、)、括號中文數字((一))、
+  // 半形/全形括號數字((1))、英文字母(A. a.)、第X條/章/節/款/項
+  const clauseStartPattern = /^(\d+(\.\d+)*[\s、.．]|[一二三四五六七八九十]{1,3}[、.．]|[（(][一二三四五六七八九十0-9]{1,3}[）)]|第[一二三四五六七八九十0-9]+[條章節款項]|[A-Za-z][.、])/;
   let text='';
   const n = Math.min(pdf.numPages, maxPages);
   for(let i=1;i<=n;i++){
