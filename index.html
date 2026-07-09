@@ -1419,14 +1419,30 @@ async function handleRegBatchFiles(input){
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    const fnMeta = extractMetaFromFilename(file.name);
     try {
       const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
         area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
       });
       const meta = extractDocMetaFromText(text, file.name);
-      rows.push({file, text, ...meta, tier:'2'});
+      rows.push({
+        file, text,
+        docNo: (fnMeta&&fnMeta.docNo) || meta.docNo,
+        title: (fnMeta&&fnMeta.title) || meta.title,
+        dept: (fnMeta&&fnMeta.dept) || meta.dept,
+        version: (fnMeta&&fnMeta.version) || meta.version || '',
+        approvedDate: meta.approvedDate,
+        tier: '2'
+      });
     } catch(e) {
-      rows.push({file, text:'', docNo:'', title:file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:'', version:'', approvedDate:'', tier:'2', _extractError:e.message});
+      rows.push({
+        file, text: '',
+        docNo: (fnMeta&&fnMeta.docNo) || '',
+        title: (fnMeta&&fnMeta.title) || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
+        dept: (fnMeta&&fnMeta.dept) || '',
+        version: (fnMeta&&fnMeta.version) || '',
+        approvedDate: '', tier: '2', _extractError: e.message
+      });
     }
     area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(${i+1}/${files.length})</div>`;
   }
