@@ -160,10 +160,11 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" onclick="gp('admin-upload-form',this)">表單上傳</div>
       <div class="nch" onclick="gp('admin-revise',this)">規章修訂比對</div>
       <div class="nch" onclick="gp('admin-pdf-test',this)">PDF文字擷取測試</div>
+      <div class="nch" id="nch-log" onclick="gp('admin-log',this)" style="display:none">操作紀錄</div>
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 2</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 3</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -256,10 +257,11 @@ function gp(key,el,param){
     'reg-unit':()=>pageRegUnit(param),
     'form-unit':()=>pageFormUnit(param),
     'admin-upload-duty':pageUploadDuty,'admin-upload-notice':pageUploadNotice,
-    'admin-upload-reg':pageUploadReg,'admin-upload-form':pageUploadForm,'admin-revise':pageRevise,'admin-perm':pagePerm,'admin-pdf-test':pagePdfTest
+    'admin-upload-reg':pageUploadReg,'admin-upload-form':pageUploadForm,'admin-revise':pageRevise,'admin-perm':pagePerm,'admin-pdf-test':pagePdfTest,'admin-log':pageActivityLog
   };
   r.innerHTML=(map[key]||(()=>'<div class="pholder">頁面開發中</div>'))();
   if(key==='admin-perm') initPermPage();
+  if(key==='admin-log') setTimeout(()=>loadActivityLog(true), 0);
   if(key==='readme') setTimeout(loadReadmeReg, 0);
   if(key==='duty') setTimeout(loadDutyList, 0);
   if(key==='notice') setTimeout(loadNoticeList, 0);
@@ -1054,7 +1056,7 @@ async function saveDuty() {
         attachments.push({name: file.name, url, size: file.size});
       }
     }
-    await addDoc(collection(window._db, 'duty_briefs'), {
+    const newRef = await addDoc(collection(window._db, 'duty_briefs'), {
       title, category, announcer,
       unit: document.getElementById('du')?.value || '',
       issuedDate: fromDate,
@@ -1063,6 +1065,7 @@ async function saveDuty() {
       attachments, status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
+    await logActivity('duty','create',newRef.id,title);
     setBtnSuccess(btn, '已儲存');
     showToast('勤前指示已儲存');
     ['dt','du','dc','dann'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1095,7 +1098,7 @@ async function saveNotice() {
         attachments.push({name: file.name, url, size: file.size});
       }
     }
-    await addDoc(collection(window._db, 'notices'), {
+    const newRef = await addDoc(collection(window._db, 'notices'), {
       title, category,
       unit: document.getElementById('nu')?.value || '',
       issuedDate: fromDate,
@@ -1107,6 +1110,7 @@ async function saveNotice() {
       attachments, status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
+    await logActivity('notice','create',newRef.id,title);
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
     ['nt','nu','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1138,6 +1142,18 @@ async function supersedeDoc(collectionName, docId, newDocId){
 }
 
 // ===== 軟刪除：標記status為deleted，不真正刪除資料，S級專用 =====
+// ===== 操作紀錄：統一記錄新增/編輯/刪除/下架動作 =====
+async function logActivity(kind, action, docId, title, extra){
+  try{
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await addDoc(collection(window._db, 'activity_log'), {
+      kind, action, docId: docId||'', title: title||'',
+      byUid: window._uid||'', byName: window._displayName||'',
+      extra: extra||'', at: serverTimestamp()
+    });
+  }catch(e){ console.error('活動紀錄寫入失敗', e); }
+}
+
 async function softDelete(collectionName, docId){
   const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
   await updateDoc(doc(window._db, collectionName, docId), {
@@ -1148,6 +1164,7 @@ async function deleteDutyItem(docId, title){
   if(!confirm(`確定要刪除「${title||'此筆勤前指示'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
   try{
     await softDelete('duty_briefs', docId);
+    await logActivity('duty','delete',docId,title);
     window._dutyDocs = (window._dutyDocs||[]).filter(d=>d.id!==docId);
     renderDutyList();
     showToast('已刪除');
@@ -1157,6 +1174,7 @@ async function deleteNoticeItem(docId, title){
   if(!confirm(`確定要刪除「${title||'此筆通告'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
   try{
     await softDelete('notices', docId);
+    await logActivity('notice','delete',docId,title);
     window._noticeDocs = (window._noticeDocs||[]).filter(d=>d.id!==docId);
     renderNoticeList();
     showToast('已刪除');
@@ -1166,6 +1184,7 @@ async function deleteRegItem(docId, title){
   if(!confirm(`確定要刪除「${title||'此份規章'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
   try{
     await softDelete('regulations', docId);
+    await logActivity('regulation','delete',docId,title);
     window._regListDocs = (window._regListDocs||[]).filter(d=>d.id!==docId);
     renderRegList();
     showToast('已刪除');
@@ -1175,6 +1194,7 @@ async function deleteFormItem(docId, title){
   if(!confirm(`確定要刪除「${title||'此份表單'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
   try{
     await softDelete('forms', docId);
+    await logActivity('form','delete',docId,title);
     window._formListDocs = (window._formListDocs||[]).filter(d=>d.id!==docId);
     renderFormList();
     showToast('已刪除');
@@ -1289,6 +1309,7 @@ async function saveReg() {
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
     if (existing) await supersedeDoc('regulations', existing.id, docRef.id);
+    await logActivity('regulation', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'');
     setBtnSuccess(btn, '上傳成功');
     showToast(existing ? '規章已上傳，並自動下架舊版本' : '規章已上傳');
     ['rd','rt','rv','rp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1330,6 +1351,7 @@ async function saveForm() {
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
     if (existing) await supersedeDoc('forms', existing.id, docRef.id);
+    await logActivity('form', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'');
     setBtnSuccess(btn, '上傳成功');
     showToast(existing ? '表單已上傳，並自動下架舊版本' : '表單已上傳');
     ['fd','ft','fver'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1511,6 +1533,7 @@ async function confirmRegBatchUpload(){
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
+    if(ok>0) await logActivity('regulation','batch_create','',`批次上傳 ${ok} 份規章`,`${superseded}份取代舊版，${skippedDup}份重複略過`);
     showToast(`已上傳 ${ok} 份規章${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
     area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因文件編號與版次都相同，判定為重複已略過`:''}</div>`;
     window._regBatchRows = [];
@@ -1620,6 +1643,7 @@ async function confirmFormBatchUpload(){
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
+    if(ok>0) await logActivity('form','batch_create','',`批次上傳 ${ok} 份表單`,`${superseded}份取代舊版，${skippedDup}份重複略過`);
     showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
     area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因表單編號與版次都相同，判定為重複已略過`:''}</div>`;
     window._formBatchRows = [];
@@ -1731,6 +1755,7 @@ async function confirmNoticeBatchUpload(){
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
+    if(ok>0) await logActivity('notice','batch_create','',`批次上傳 ${ok} 份通告`);
     showToast(`已上傳 ${ok} 份通告${fail?`，${fail} 份失敗`:''}`);
     area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}；缺分類或日期的通告會出現在「缺到期日」分頁，請記得補登</div>`;
     window._noticeBatchRows = [];
@@ -1738,6 +1763,60 @@ async function confirmNoticeBatchUpload(){
     setBtnError(btn);
     showToast('批次上傳失敗：'+e.message);
   }
+}
+
+function pageActivityLog(){return`<div class="ptitle">後臺控管 — 操作紀錄</div><div class="psub">記錄所有新增／編輯／刪除／下架動作，由新到舊排序</div>
+<div class="card"><div class="fg2" style="margin-bottom:0">
+  <div><label class="fl2">類型篩選</label><select id="log-kind-filter" onchange="loadActivityLog(true)"><option value="">全部</option><option value="duty">勤前指示</option><option value="notice">通告</option><option value="regulation">規章</option><option value="form">表單</option></select></div>
+  <div><label class="fl2">動作篩選</label><select id="log-action-filter" onchange="loadActivityLog(true)"><option value="">全部</option><option value="create">新增</option><option value="update">編輯／取代</option><option value="delete">刪除</option><option value="batch_create">批次上傳</option></select></div>
+</div></div>
+<div id="log-list-area" style="margin-top:14px"><div class="pholder">載入中…</div></div>
+<div style="text-align:center;margin-top:12px"><button class="btn" id="log-more-btn" style="display:none" onclick="loadActivityLog(false)"><i class="ti ti-chevron-down"></i> 載入更多</button></div>`;}
+
+const LOG_ACTION_LABEL={create:'新增',update:'編輯／取代',delete:'刪除',supersede:'下架舊版',batch_create:'批次上傳'};
+const LOG_KIND_LABEL={duty:'勤前指示',notice:'通告',regulation:'規章',form:'表單'};
+async function loadActivityLog(reset){
+  const area=document.getElementById('log-list-area');
+  if(!area)return;
+  if(reset){ window._logDocs=[]; window._logCursor=null; area.innerHTML='<div class="pholder">載入中…</div>'; }
+  try{
+    const {collection,query,orderBy,limit,startAfter,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    let q=query(collection(window._db,'activity_log'),orderBy('at','desc'),limit(30));
+    if(window._logCursor) q=query(collection(window._db,'activity_log'),orderBy('at','desc'),startAfter(window._logCursor),limit(30));
+    const snap=await getDocs(q);
+    const newDocs=[]; snap.forEach(d=>newDocs.push({id:d.id,...d.data()}));
+    window._logDocs=(window._logDocs||[]).concat(newDocs);
+    window._logCursor=snap.docs.length?snap.docs[snap.docs.length-1]:window._logCursor;
+    const moreBtn=document.getElementById('log-more-btn');
+    if(moreBtn) moreBtn.style.display=(newDocs.length===30)?'':'none';
+    renderActivityLog();
+  }catch(e){
+    area.innerHTML=`<div class="pholder">載入失敗：${e.message}</div>`;
+  }
+}
+function renderActivityLog(){
+  const area=document.getElementById('log-list-area');
+  if(!area)return;
+  const kindF=document.getElementById('log-kind-filter')?.value||'';
+  const actF=document.getElementById('log-action-filter')?.value||'';
+  let list=(window._logDocs||[]).filter(d=>(!kindF||d.kind===kindF)&&(!actF||d.action===actF));
+  if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的紀錄</div>';return;}
+  const actColor={create:'#3B6D11',update:'#0c447c',delete:'#E24B4A',batch_create:'#8a5a12',supersede:'#856404'};
+  area.innerHTML=`<div class="card" style="padding:0;overflow:hidden"><table class="vtbl">
+    <thead><tr><th>時間</th><th>類型</th><th>動作</th><th>項目</th><th>操作人</th><th>備註</th></tr></thead>
+    <tbody>${list.map(d=>{
+      const t=d.at&&typeof d.at.toDate==='function'?d.at.toDate():null;
+      const ts=t?`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`:'—';
+      return `<tr>
+        <td style="white-space:nowrap">${ts}</td>
+        <td>${LOG_KIND_LABEL[d.kind]||d.kind||'—'}</td>
+        <td><span style="color:${actColor[d.action]||'#6b6b67'};font-weight:500">${LOG_ACTION_LABEL[d.action]||d.action||'—'}</span></td>
+        <td>${escapeHtml(d.title||'—')}</td>
+        <td>${escapeHtml(d.byName||'—')}</td>
+        <td style="color:var(--ts);font-size:11px">${escapeHtml(d.extra||'')}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
 }
 
 function pagePdfTest(){return`<div class="ptitle">後臺控管 — PDF文字擷取測試</div><div class="psub">測試PDF能否被正確讀取文字，並檢查系統實際擷取到的文字順序，用來確認/調整自動辨識規則</div>
@@ -2124,6 +2203,7 @@ async function confirmSheetsImport(){
       if(btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 處理中…(${done}/${rows.length})`;
     }
     setBtnSuccess(btn,'已完成');
+    if(added>0||updated>0) await logActivity('duty','batch_create','',`Sheets匯入：新增${added}筆、更新${updated}筆`);
     showToast(`新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料`:''}`);
     area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已完成：新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整處理，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}</div>`;
   }catch(e){
@@ -2138,7 +2218,7 @@ document.addEventListener('DOMContentLoaded',()=>{document.getElementById('l-acc
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import {getFirestore,doc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {getFirestore,doc,getDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {getStorage} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 window._fbConfig={apiKey:"AIzaSyBaYrnW9w8C4vpqRDH86HfL_zk3Rhaqgy0",authDomain:"tmrt-regulation-aae6f.firebaseapp.com",projectId:"tmrt-regulation-aae6f",storageBucket:"tmrt-regulation-aae6f.firebasestorage.app",messagingSenderId:"684290109416",appId:"1:684290109416:web:a3854d7ded1551e2f97e5d"};
 const app=initializeApp(window._fbConfig);
@@ -2151,22 +2231,48 @@ window.doLogin=async function(){
   try{await signInWithEmailAndPassword(auth,'tcm'+acc+'@tmrt.com.tw',pwd);}
   catch(e){errEl.innerHTML='<i class="ti ti-alert-circle"></i> 員工編號或密碼錯誤';btn.textContent='登入';btn.disabled=false;}
 };
-window.doLogout=async function(){await signOut(auth);};
+window.doLogout=async function(){
+  if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
+  await signOut(auth);
+};
+let _sessionUnsub=null;
+async function claimSession(uid){
+  const {updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  const sid=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));
+  window._mySessionId=sid;
+  await updateDoc(doc(db,'users',uid),{activeSessionId:sid,lastLoginAt:serverTimestamp()});
+  return sid;
+}
+function watchSession(uid){
+  if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
+  _sessionUnsub=onSnapshot(doc(db,'users',uid),(snap)=>{
+    const data=snap.data();
+    if(data&&data.activeSessionId&&window._mySessionId&&data.activeSessionId!==window._mySessionId){
+      if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
+      alert('此帳號已在其他裝置或分頁登入，您已被登出。');
+      signOut(auth);
+    }
+  });
+}
 onAuthStateChanged(auth,async(user)=>{
   if(user){
     const ud=await getDoc(doc(db,'users',user.uid));const d=ud.exists()?ud.data():{};const level=d.level||'B';window._level=level;
     window._uid=user.uid;
     const displayId=user.email.replace('tcm','').replace('@tmrt.com.tw','');
+    window._displayName=d.name||displayId;
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='flex';
     document.getElementById('uid-disp').textContent=d.name||displayId;
     const badge=document.getElementById('lv-badge');badge.textContent=level+'級';badge.className='badge lv-'+level.toLowerCase();
     if(level==='S'||level==='A'){document.getElementById('nsec-admin').style.display='';document.getElementById('ni-admin').style.display='flex';document.getElementById('sub-admin').style.display='none';}
-    if(level==='S'){document.getElementById('nch-perm').style.display='';}
+    if(level==='S'){document.getElementById('nch-perm').style.display='';document.getElementById('nch-log').style.display='';}
+    await claimSession(user.uid);
+    watchSession(user.uid);
     buildRegTree();
     buildFormTree();
     gp('readme',document.querySelector('.ni'));
   }else{
+    if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
     document.getElementById('login-screen').style.display='flex';
     document.getElementById('app-screen').style.display='none';
     document.getElementById('lbtn').textContent='登入';document.getElementById('lbtn').disabled=false;
