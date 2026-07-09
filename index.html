@@ -518,7 +518,11 @@ function renderDutyList(){
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
     return true;
   });
-  list.sort((a,b)=>(a.expiryDate||'9999').localeCompare(b.expiryDate||'9999'));
+  if(st.tab==='expired'){
+    list.sort((a,b)=>(b.expiryDate||'0000').localeCompare(a.expiryDate||'0000')); // 逾期分頁：剛下架的排最上面，越久以前過期的沉到最下面
+  } else {
+    list.sort((a,b)=>(a.expiryDate||'9999').localeCompare(b.expiryDate||'9999')); // 其他分頁：越快到期排越前面
+  }
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的勤前指示</div>';return;}
   area.innerHTML=list.map(d=>{
     const cat=DUTY_CATEGORIES.find(c=>c.id===d.category);
@@ -569,7 +573,11 @@ function renderNoticeList(){
     if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
     return true;
   });
-  list.sort((a,b)=>(a.expiryDate||'9999').localeCompare(b.expiryDate||'9999'));
+  if(st.tab==='expired'){
+    list.sort((a,b)=>(b.expiryDate||'0000').localeCompare(a.expiryDate||'0000')); // 逾期分頁：剛下架的排最上面，越久以前過期的沉到最下面
+  } else {
+    list.sort((a,b)=>(a.expiryDate||'9999').localeCompare(b.expiryDate||'9999')); // 其他分頁：越快到期排越前面
+  }
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的通告</div>';return;}
   area.innerHTML=list.map(d=>{
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
