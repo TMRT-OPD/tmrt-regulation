@@ -1823,6 +1823,8 @@ async function extractPdfText(file, maxPages, onProgress){
     text += pageText + '\n';
     if(onProgress && (i % 5 === 0 || i === n)) onProgress(i, n, pdf.numPages);
   }
+  // 濾除頁碼：整行只有1~4個數字、沒有其他文字的行，幾乎必定是頁尾頁碼而非真實內容
+  text = text.split('\n').filter(line => !/^\s*\d{1,4}\s*$/.test(line)).join('\n');
   return {text, numPages: pdf.numPages, extractedPages: n, truncated: pdf.numPages > maxPages};
 }
 
