@@ -1798,7 +1798,13 @@ async function extractPdfText(file, maxPages, onProgress){
       if(last){
         const sameLine = Math.abs(item.transform[5]-last.transform[5]) < Math.max(2,(item.height||10)*0.4);
         if(!sameLine){
-          pageText += '\n';
+          const gapY = Math.abs(item.transform[5]-last.transform[5]);
+          const lineHeight = Math.max(item.height||10, last.height||10, 1);
+          if(gapY > lineHeight*1.7){
+            pageText += '\n'; // 行距明顯拉大，視為真正的段落/表格換行
+          } else {
+            pageText += ' '; // 只是同一段落內的自然換行，接空格銜接成連續文字
+          }
         } else {
           const gap = item.transform[4] - (last.transform[4] + (last.width||0));
           if(gap > (last.height||10)*0.28) pageText += ' ';
