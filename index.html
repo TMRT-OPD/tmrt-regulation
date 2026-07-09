@@ -1013,6 +1013,24 @@ async function saveNotice() {
   }
 }
 
+// ===== 版本管理：查找既有有效版本、將舊版下架（保留歷史，不刪除） =====
+async function findActiveDoc(collectionName, field, value){
+  if (!value) return null;
+  const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  const q = query(collection(window._db, collectionName), where(field,'==',value), where('status','==','active'));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  let result = null;
+  snap.forEach(d => { result = {id: d.id, data: d.data()}; });
+  return result;
+}
+async function supersedeDoc(collectionName, docId, newDocId){
+  const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  await updateDoc(doc(window._db, collectionName, docId), {
+    status: 'superseded', supersededAt: serverTimestamp(), supersededBy: newDocId || ''
+  });
+}
+
 async function saveReg() {
   const docNo = document.getElementById('rd')?.value?.trim();
   const title = document.getElementById('rt')?.value?.trim();
@@ -1025,8 +1043,13 @@ async function saveReg() {
     const ver = document.getElementById('rv')?.value || '1';
     const file = fileInput.files[0];
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const existing = await findActiveDoc('regulations', 'docNo', docNo);
+    if (existing && String(existing.data.version||'') === String(ver)) {
+      const proceed = confirm(`文件編號 ${docNo} 版次 ${ver} 目前已有一份有效版本，是否仍要上傳並取代？\n（原檔案不會被刪除，僅會下架不再顯示於瀏覽頁面）`);
+      if (!proceed) { setBtnError(btn); return; }
+    }
     const fileUrl = await uploadFile(file, `regulations/${docNo}/${ver}/${file.name}`);
-    await addDoc(collection(window._db, 'regulations'), {
+    const docRef = await addDoc(collection(window._db, 'regulations'), {
       docNo, title,
       dept: document.getElementById('rdept')?.value || '',
       tier: parseInt(document.getElementById('rtier')?.value) || 2,
@@ -1038,8 +1061,9 @@ async function saveReg() {
       status: 'active',
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
+    if (existing) await supersedeDoc('regulations', existing.id, docRef.id);
     setBtnSuccess(btn, '上傳成功');
-    showToast('規章已上傳');
+    showToast(existing ? '規章已上傳，並自動下架舊版本' : '規章已上傳');
     ['rd','rt','rv','rp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const fl = document.getElementById('rfl'); if (fl) fl.innerHTML = '';
     window._regExtractedText = '';
@@ -1061,20 +1085,21 @@ async function saveForm() {
   try {
     const file = fileInput.files[0];
     const dept = document.getElementById('fdept')?.value || '';
+    const formNo = document.getElementById('fd')?.value?.trim() || '';
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const existing = formNo ? await findActiveDoc('forms', 'formNo', formNo) : null;
     const fileUrl = await uploadFile(file, `forms/${dept||'unassigned'}/${Date.now()}_${file.name}`);
-    await addDoc(collection(window._db, 'forms'), {
-      title,
-      formNo: document.getElementById('fd')?.value || '',
-      dept,
+    const docRef = await addDoc(collection(window._db, 'forms'), {
+      title, formNo, dept,
       approvedDate: document.getElementById('fdate')?.value || '',
       fileUrl, fileName: file.name, fileSize: file.size,
       fullText: window._formExtractedText || '',
       status: 'active',
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
+    if (existing) await supersedeDoc('forms', existing.id, docRef.id);
     setBtnSuccess(btn, '上傳成功');
-    showToast('表單已上傳');
+    showToast(existing ? '表單已上傳，並自動下架舊版本' : '表單已上傳');
     ['fd','ft'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const fdateEl = document.getElementById('fdate'); if (fdateEl) fdateEl.value = '';
     const fl = document.getElementById('ffl'); if (fl) fl.innerHTML = '';
@@ -1188,7 +1213,7 @@ async function confirmRegBatchUpload(){
   const area = document.getElementById('reg-batch-preview');
   const btn = area.querySelector('.btn-primary');
   setBtnLoading(btn, `上傳中…(0/${rows.length})`);
-  let ok=0, fail=0;
+  let ok=0, fail=0, superseded=0, skippedDup=0;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     for (let i=0; i<rows.length; i++) {
@@ -1196,22 +1221,27 @@ async function confirmRegBatchUpload(){
       try {
         if (!r.title) throw new Error('缺文件名稱');
         const ver = r.version || '1';
-        const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
-        await addDoc(collection(window._db, 'regulations'), {
-          docNo: r.docNo || '', title: r.title,
-          dept: r.dept || '', tier: parseInt(r.tier) || 2, version: ver,
-          approvedDate: r.approvedDate || '', parentDoc: '',
-          fileUrl, fileName: r.file.name, fileSize: r.file.size,
-          fullText: r.text || '', status: 'active',
-          createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
-        });
-        ok++;
+        const existing = await findActiveDoc('regulations', 'docNo', r.docNo);
+        if (existing && String(existing.data.version||'') === String(ver)) { skippedDup++; }
+        else {
+          const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
+          const docRef = await addDoc(collection(window._db, 'regulations'), {
+            docNo: r.docNo || '', title: r.title,
+            dept: r.dept || '', tier: parseInt(r.tier) || 2, version: ver,
+            approvedDate: r.approvedDate || '', parentDoc: '',
+            fileUrl, fileName: r.file.name, fileSize: r.file.size,
+            fullText: r.text || '', status: 'active',
+            createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
+          });
+          if (existing) { await supersedeDoc('regulations', existing.id, docRef.id); superseded++; }
+          ok++;
+        }
       } catch(e) { fail++; }
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
-    showToast(`已上傳 ${ok} 份規章${fail?`，${fail} 份失敗`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}</div>`;
+    showToast(`已上傳 ${ok} 份規章${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因文件編號與版次都相同，判定為重複已略過`:''}</div>`;
     window._regBatchRows = [];
   } catch(e) {
     setBtnError(btn);
@@ -1278,28 +1308,30 @@ async function confirmFormBatchUpload(){
   const area = document.getElementById('form-batch-preview');
   const btn = area.querySelector('.btn-primary');
   setBtnLoading(btn, `上傳中…(0/${rows.length})`);
-  let ok=0, fail=0;
+  let ok=0, fail=0, superseded=0;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     for (let i=0; i<rows.length; i++) {
       const r = rows[i];
       try {
         if (!r.title) throw new Error('缺表單名稱');
+        const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo) : null;
         const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
-        await addDoc(collection(window._db, 'forms'), {
+        const docRef = await addDoc(collection(window._db, 'forms'), {
           title: r.title, formNo: r.formNo || '', dept: r.dept || '',
           approvedDate: r.approvedDate || '',
           fileUrl, fileName: r.file.name, fileSize: r.file.size,
           fullText: r.text || '', status: 'active',
           createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
         });
+        if (existing) { await supersedeDoc('forms', existing.id, docRef.id); superseded++; }
         ok++;
       } catch(e) { fail++; }
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
-    showToast(`已上傳 ${ok} 份表單${fail?`，${fail} 份失敗`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}</div>`;
+    showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}`);
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}</div>`;
     window._formBatchRows = [];
   } catch(e) {
     setBtnError(btn);
