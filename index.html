@@ -678,6 +678,7 @@ function renderFormList(){
   const rows = list.map(d => `<tr>
     <td><strong>${highlightText(d.formNo||'—',kw)}</strong></td>
     <td>${highlightText(d.title||'—',kw)}</td>
+    <td>${d.version?('版次 '+escapeHtml(d.version)):'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
       ${d.fileUrl ? `<a href="${d.fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-eye"></i> 查閱</a>` : ''}
@@ -686,7 +687,7 @@ function renderFormList(){
   </tr>`).join('');
   area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
     <table class="vtbl">
-      <thead><tr><th>表單編號</th><th>表單名稱</th><th>核決日期</th><th>操作</th></tr></thead>
+      <thead><tr><th>表單編號</th><th>表單名稱</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
@@ -785,10 +786,11 @@ function pageUploadForm(){return`<div class="ptitle">後臺控管 — 表單上�
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">表單編號（選填）</label><input type="text" id="fd" placeholder="例：TMRT-SOC-OPD-4-1001"></div><div><label class="fl2">表單名稱 *</label><input type="text" id="ft" placeholder="請輸入表單名稱"></div></div>
   <div class="fg2" style="margin-bottom:12px">
     <div><label class="fl2">所屬處室</label><select id="fdept">${deptOptionsHtml('')}</select></div>
-    <div><label class="fl2">核決日期</label><input type="date" id="fdate"></div>
+    <div><label class="fl2">版次</label><input type="text" id="fver" placeholder="例：2"></div>
   </div>
-  <div class="info-box"><i class="ti ti-info-circle"></i>若選取的是 PDF，將自動擷取全文並嘗試帶入表單編號／處室／核決日期，請確認後再送出（Word/Excel 檔無法自動擷取，需手動填寫）</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveForm()"><i class="ti ti-check"></i> 上傳表單</button><button class="btn" onclick="clearForm(['fd','ft'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div style="margin-bottom:12px;max-width:calc(50% - 6px)"><label class="fl2">核決日期</label><input type="date" id="fdate"></div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>檔名若符合「文件編號名稱(N版)」格式（如 TMRT-ISD-GEN-0-4001職業災害速報表(2版).docx），將自動從檔名帶入編號／名稱／版次／處室；PDF另會擷取全文供搜尋索引，Word/Excel僅能靠檔名辨識</div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveForm()"><i class="ti ti-check"></i> 上傳表單</button><button class="btn" onclick="clearForm(['fd','ft','fver'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="fb-b"><div class="card">
   <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾，系統會逐一擷取PDF全文並嘗試辨識表單編號／處室／核決日期，辨識完可逐筆編輯修正，確認後才會送出；資料夾中非PDF檔案（Word/Excel）仍會上傳，但欄位需手動填寫</div>
@@ -1086,11 +1088,16 @@ async function saveForm() {
     const file = fileInput.files[0];
     const dept = document.getElementById('fdept')?.value || '';
     const formNo = document.getElementById('fd')?.value?.trim() || '';
+    const version = document.getElementById('fver')?.value?.trim() || '';
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const existing = formNo ? await findActiveDoc('forms', 'formNo', formNo) : null;
+    if (existing && version && String(existing.data.version||'') === String(version)) {
+      const proceed = confirm(`表單編號 ${formNo} 版次 ${version} 目前已有一份有效版本，是否仍要上傳並取代？\n（原檔案不會被刪除，僅會下架不再顯示於瀏覽頁面）`);
+      if (!proceed) { setBtnError(btn); return; }
+    }
     const fileUrl = await uploadFile(file, `forms/${dept||'unassigned'}/${Date.now()}_${file.name}`);
     const docRef = await addDoc(collection(window._db, 'forms'), {
-      title, formNo, dept,
+      title, formNo, dept, version,
       approvedDate: document.getElementById('fdate')?.value || '',
       fileUrl, fileName: file.name, fileSize: file.size,
       fullText: window._formExtractedText || '',
@@ -1100,7 +1107,7 @@ async function saveForm() {
     if (existing) await supersedeDoc('forms', existing.id, docRef.id);
     setBtnSuccess(btn, '上傳成功');
     showToast(existing ? '表單已上傳，並自動下架舊版本' : '表單已上傳');
-    ['fd','ft'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['fd','ft','fver'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const fdateEl = document.getElementById('fdate'); if (fdateEl) fdateEl.value = '';
     const fl = document.getElementById('ffl'); if (fl) fl.innerHTML = '';
     window._formExtractedText = '';
@@ -1117,6 +1124,13 @@ async function autoFillRegFromPdf(input){
   const file = input.files && input.files[0];
   if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
   const st = document.getElementById('reg-extract-status');
+  const fnMeta = extractMetaFromFilename(file.name);
+  if (fnMeta && fnMeta.docNo) {
+    const rd = document.getElementById('rd'); if (rd && !rd.value) rd.value = fnMeta.docNo;
+    const rt = document.getElementById('rt'); if (rt && !rt.value && fnMeta.title) rt.value = fnMeta.title;
+    const rv = document.getElementById('rv'); if (rv && !rv.value && fnMeta.version) rv.value = fnMeta.version;
+    const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && fnMeta.dept) rdept.value = fnMeta.dept;
+  }
   if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文並辨識欄位…';
   try {
     const {text, truncated} = await extractPdfText(file, 500, (i,n,total)=>{
@@ -1129,16 +1143,30 @@ async function autoFillRegFromPdf(input){
     const rv = document.getElementById('rv'); if (rv && !rv.value && meta.version) rv.value = meta.version;
     const rdate = document.getElementById('rdate'); if (rdate && !rdate.value && meta.approvedDate) rdate.value = meta.approvedDate;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && meta.dept) rdept.value = meta.dept;
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤${meta.docNo?'':'（未辨識到文件編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+    const finalDocNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到文件編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
   } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳，僅無法自動帶入欄位／建立全文索引）</span>`;
+    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳${fnMeta?'，已從檔名帶入部分欄位':''}）</span>`;
   }
 }
 
 async function autoFillFormFromPdf(input){
   const file = input.files && input.files[0];
-  if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+  if (!file) return;
   const st = document.getElementById('form-extract-status');
+  const fnMeta = extractMetaFromFilename(file.name);
+  if (fnMeta && fnMeta.docNo) {
+    const fd = document.getElementById('fd'); if (fd && !fd.value) fd.value = fnMeta.docNo;
+    const ft = document.getElementById('ft'); if (ft && !ft.value && fnMeta.title) ft.value = fnMeta.title;
+    const fver = document.getElementById('fver'); if (fver && !fver.value && fnMeta.version) fver.value = fnMeta.version;
+    const fdept = document.getElementById('fdept'); if (fdept && !fdept.value && fnMeta.dept) fdept.value = fnMeta.dept;
+  }
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    if (st) st.innerHTML = fnMeta && fnMeta.docNo
+      ? '<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（Word/Excel無法擷取全文索引）'
+      : '<span style="color:#856404">檔名未包含可辨識的文件編號格式，請手動輸入（Word/Excel無法擷取全文）</span>';
+    return;
+  }
   if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文並辨識欄位…';
   try {
     const {text, truncated} = await extractPdfText(file, 500, (i,n,total)=>{
@@ -1148,11 +1176,13 @@ async function autoFillFormFromPdf(input){
     const meta = extractDocMetaFromText(text, file.name);
     const fd = document.getElementById('fd'); if (fd && !fd.value && meta.docNo) fd.value = meta.docNo;
     const ft = document.getElementById('ft'); if (ft && !ft.value && meta.title) ft.value = meta.title;
+    const fver = document.getElementById('fver'); if (fver && !fver.value && meta.version) fver.value = meta.version;
     const fdate = document.getElementById('fdate'); if (fdate && !fdate.value && meta.approvedDate) fdate.value = meta.approvedDate;
     const fdept = document.getElementById('fdept'); if (fdept && !fdept.value && meta.dept) fdept.value = meta.dept;
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤${meta.docNo?'':'（未辨識到表單編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+    const finalDocNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到表單編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
   } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳，僅無法自動帶入欄位／建立全文索引）</span>`;
+    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳${fnMeta?'，已從檔名帶入部分欄位':''}）</span>`;
   }
 }
 
@@ -1254,25 +1284,40 @@ async function handleFormBatchFiles(input){
   const files = Array.from(input.files || []).filter(f => /\.(pdf|doc|docx|xls|xlsx)$/i.test(f.name));
   const area = document.getElementById('form-batch-preview');
   if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到支援的檔案</div>'; return; }
-  area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(0/${files.length})</div>`;
+  area.innerHTML = `<div class="pholder">正在解析檔名並辨識中…(0/${files.length})</div>`;
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    const fnMeta = extractMetaFromFilename(file.name);
     if (isPdf) {
       try {
         const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
           area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
         });
         const meta = extractDocMetaFromText(text, file.name);
-        rows.push({file, text, formNo:meta.docNo, title:meta.title, dept:meta.dept, approvedDate:meta.approvedDate});
+        rows.push({
+          file, text,
+          formNo: (fnMeta&&fnMeta.docNo) || meta.docNo,
+          title: (fnMeta&&fnMeta.title) || meta.title,
+          dept: (fnMeta&&fnMeta.dept) || meta.dept,
+          version: (fnMeta&&fnMeta.version) || meta.version || '',
+          approvedDate: meta.approvedDate
+        });
       } catch(e) {
-        rows.push({file, text:'', formNo:'', title:file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:'', approvedDate:'', _extractError:e.message});
+        rows.push({file, text:'', formNo:(fnMeta&&fnMeta.docNo)||'', title:(fnMeta&&fnMeta.title)||file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:(fnMeta&&fnMeta.dept)||'', version:(fnMeta&&fnMeta.version)||'', approvedDate:'', _extractError:e.message});
       }
     } else {
-      rows.push({file, text:'', formNo:'', title:file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:'', approvedDate:'', _notPdf:true});
+      rows.push({
+        file, text:'',
+        formNo: fnMeta ? fnMeta.docNo : '',
+        title: fnMeta && fnMeta.title ? fnMeta.title : file.name.replace(/\.[a-zA-Z0-9]+$/,''),
+        dept: fnMeta ? fnMeta.dept : '',
+        version: fnMeta ? fnMeta.version : '',
+        approvedDate: '', _notPdf: true
+      });
     }
-    area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(${i+1}/${files.length})</div>`;
+    area.innerHTML = `<div class="pholder">正在解析中…(${i+1}/${files.length})</div>`;
   }
   window._formBatchRows = rows;
   renderFormBatchPreview();
@@ -1284,17 +1329,18 @@ function renderFormBatchPreview(){
   if (!area) return;
   if (rows.length === 0) { area.innerHTML = ''; return; }
   const rowsHtml = rows.map((r,i)=>`<tr>
-    <td>${escapeHtml(r.file.name)}${r._notPdf?`<div style="color:#856404;font-size:11px">非PDF，需手動填寫</div>`:''}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗</div>`:''}</td>
+    <td>${escapeHtml(r.file.name)}${r._notPdf?`<div style="color:#856404;font-size:11px">非PDF，僅靠檔名辨識</div>`:''}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗</div>`:''}</td>
     <td><input type="text" id="formb-no-${i}" value="${escapeHtml(r.formNo)}" style="min-width:150px" oninput="window._formBatchRows[${i}].formNo=this.value"></td>
     <td><input type="text" id="formb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:160px" oninput="window._formBatchRows[${i}].title=this.value"></td>
     <td><select id="formb-dept-${i}" style="min-width:150px" onchange="window._formBatchRows[${i}].dept=this.value">${deptOptionsHtml(r.dept)}</select></td>
+    <td><input type="text" id="formb-ver-${i}" value="${escapeHtml(r.version)}" style="width:50px" oninput="window._formBatchRows[${i}].version=this.value"></td>
     <td><input type="date" id="formb-date-${i}" value="${r.approvedDate||''}" oninput="window._formBatchRows[${i}].approvedDate=this.value"></td>
   </tr>`).join('');
   area.innerHTML = `
     <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，請逐筆檢查／修改辨識結果，確認無誤後按下方按鈕送出</div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px">
       <table class="vtbl">
-        <thead><tr><th>檔名</th><th>表單編號</th><th>表單名稱</th><th>所屬處室</th><th>核決日期</th></tr></thead>
+        <thead><tr><th>檔名</th><th>表單編號</th><th>表單名稱</th><th>所屬處室</th><th>版次</th><th>核決日期</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
@@ -1308,7 +1354,7 @@ async function confirmFormBatchUpload(){
   const area = document.getElementById('form-batch-preview');
   const btn = area.querySelector('.btn-primary');
   setBtnLoading(btn, `上傳中…(0/${rows.length})`);
-  let ok=0, fail=0, superseded=0;
+  let ok=0, fail=0, superseded=0, skippedDup=0;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     for (let i=0; i<rows.length; i++) {
@@ -1316,22 +1362,25 @@ async function confirmFormBatchUpload(){
       try {
         if (!r.title) throw new Error('缺表單名稱');
         const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo) : null;
-        const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
-        const docRef = await addDoc(collection(window._db, 'forms'), {
-          title: r.title, formNo: r.formNo || '', dept: r.dept || '',
-          approvedDate: r.approvedDate || '',
-          fileUrl, fileName: r.file.name, fileSize: r.file.size,
-          fullText: r.text || '', status: 'active',
-          createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
-        });
-        if (existing) { await supersedeDoc('forms', existing.id, docRef.id); superseded++; }
-        ok++;
+        if (existing && r.version && String(existing.data.version||'') === String(r.version)) { skippedDup++; }
+        else {
+          const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
+          const docRef = await addDoc(collection(window._db, 'forms'), {
+            title: r.title, formNo: r.formNo || '', dept: r.dept || '', version: r.version || '',
+            approvedDate: r.approvedDate || '',
+            fileUrl, fileName: r.file.name, fileSize: r.file.size,
+            fullText: r.text || '', status: 'active',
+            createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
+          });
+          if (existing) { await supersedeDoc('forms', existing.id, docRef.id); superseded++; }
+          ok++;
+        }
       } catch(e) { fail++; }
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
-    showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}</div>`;
+    showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因表單編號與版次都相同，判定為重複已略過`:''}</div>`;
     window._formBatchRows = [];
   } catch(e) {
     setBtnError(btn);
@@ -1652,6 +1701,20 @@ function normalizeExtractedText(text){
 function flexLabel(label){
   return label.split('').map(c=>c.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s*');
 }
+// 從檔名直接解析文件編號／名稱／版次（許多表單本身就是Word/Excel，沒有PDF全文可讀，檔名反而是最可靠來源）
+// 支援格式如：TMRT-ISD-GEN-0-4001職業災害速報表(2版).docx
+function extractMetaFromFilename(fileName){
+  const base = fileName.replace(/\.[a-zA-Z0-9]+$/, '');
+  const m = base.match(/^(TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5})(.*?)(?:\((\d+)\s*版\))?$/i);
+  if (!m) return null;
+  const docNo = m[1].toUpperCase();
+  const title = (m[2]||'').trim();
+  const version = m[3] || '';
+  const parts = docNo.split('-');
+  const dept = guessDeptFromCode(parts[1]) || guessDeptFromCode(parts[2]) || '';
+  return {docNo, title, version, dept};
+}
+
 function extractDocMetaFromText(text, fileName){
   const norm = normalizeExtractedText(text);
   const compact = norm.replace(/\s+/g,''); // 完全去空白版本，專門用來抓文件編號這類代碼（代碼本身不該有空白）
