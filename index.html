@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 6</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 7</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -262,6 +262,7 @@ function toggleSub(id,el){const s=document.getElementById(id);if(!s)return;const
 function gp(key,el,param){
   document.querySelectorAll('.ni,.nch').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
+  try{ sessionStorage.setItem('lastRoute', JSON.stringify({key, param: param||null})); }catch(e){}
   const r=document.getElementById('main');
   const map={
     readme:pageReadme,search:pageSearch,
@@ -2576,11 +2577,13 @@ window.doLogin=async function(){
   const acc=document.getElementById('l-acc').value.trim(),pwd=document.getElementById('l-pwd').value,errEl=document.getElementById('l-err'),btn=document.getElementById('lbtn');
   errEl.innerHTML='';if(!acc||!pwd){errEl.innerHTML='<i class="ti ti-alert-circle"></i> 請輸入帳號與密碼';return}
   btn.textContent='登入中…';btn.disabled=true;
+  window._isFreshLogin=true;
   try{await signInWithEmailAndPassword(auth,'tcm'+acc+'@tmrt.com.tw',pwd);}
-  catch(e){errEl.innerHTML='<i class="ti ti-alert-circle"></i> 員工編號或密碼錯誤';btn.textContent='登入';btn.disabled=false;}
+  catch(e){window._isFreshLogin=false;errEl.innerHTML='<i class="ti ti-alert-circle"></i> 員工編號或密碼錯誤';btn.textContent='登入';btn.disabled=false;}
 };
 window.doLogout=async function(){
   if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
+  try{sessionStorage.removeItem('lastRoute');}catch(e){}
   await signOut(auth);
 };
 let _sessionUnsub=null;
@@ -2618,7 +2621,16 @@ onAuthStateChanged(auth,async(user)=>{
     watchSession(user.uid);
     buildRegTree();
     buildFormTree();
-    gp('readme',document.querySelector('.ni'));
+    if(window._isFreshLogin){
+      window._isFreshLogin=false;
+      try{sessionStorage.removeItem('lastRoute');}catch(e){}
+      gp('readme',document.querySelector('.ni'));
+    }else{
+      let restored=null;
+      try{ const saved=sessionStorage.getItem('lastRoute'); if(saved) restored=JSON.parse(saved); }catch(e){}
+      if(restored&&restored.key){ gp(restored.key,null,restored.param); }
+      else{ gp('readme',document.querySelector('.ni')); }
+    }
   }else{
     if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
     document.getElementById('login-screen').style.display='flex';
