@@ -418,7 +418,7 @@ function renderFilterUI(kind,categories){
 function pageDuty(){
   const c=window._level==='S'||window._level==='A';
   window._dutyState=window._dutyState||{tab:'active',category:''};
-  return `<div class="ptitle">勤前指示</div><div class="psub">依到期日排序，越快到期排越前面</div>
+  return `<div class="ptitle">勤前指示</div><div class="psub">依到期日排序，越快到期排越前面　<span id="duty-last-updated" style="color:var(--tt)"></span></div>
   ${c?'<button class="btn btn-primary" style="margin-bottom:14px" onclick="gp(\'admin-upload-duty\',null)"><i class="ti ti-plus"></i> 新增勤前指示</button>':''}
   <div class="tabs" id="duty-tabs">
     <div class="tab ${window._dutyState.tab==='active'?'active':''}" data-tab="active" onclick="switchListTab('duty','active')">效期內</div>
@@ -434,7 +434,7 @@ function pageDuty(){
 function pageNotice(){
   const c=window._level==='S'||window._level==='A';
   window._noticeState=window._noticeState||{tab:'active',category:''};
-  return `<div class="ptitle">通告</div><div class="psub">含展延通告（另行標記）；標示已修訂／未修訂狀態</div>
+  return `<div class="ptitle">通告</div><div class="psub">含展延通告（另行標記）；標示已修訂／未修訂狀態　<span id="notice-last-updated" style="color:var(--tt)"></span></div>
   ${c?'<button class="btn btn-primary" style="margin-bottom:14px" onclick="gp(\'admin-upload-notice\',null)"><i class="ti ti-plus"></i> 新增通告</button>':''}
   <div class="tabs" id="notice-tabs">
     <div class="tab ${window._noticeState.tab==='active'?'active':''}" data-tab="active" onclick="switchListTab('notice','active')">效期內</div>
@@ -445,6 +445,23 @@ function pageNotice(){
   <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告" oninput="renderNoticeList()"></div>
   ${renderFilterUI('notice',NOTICE_CATEGORIES)}
   <div id="notice-list-area"><div class="pholder">載入中…</div></div>`;
+}
+
+function computeLastUpdated(docs){
+  let maxMs=0;
+  (docs||[]).forEach(d=>{
+    const c=d.updatedAt||d.createdAt;
+    if(c&&typeof c.toDate==='function'){
+      const ms=c.toDate().getTime();
+      if(ms>maxMs)maxMs=ms;
+    }
+  });
+  return maxMs?new Date(maxMs):null;
+}
+function formatLastUpdated(date){
+  if(!date)return '';
+  const pad=n=>String(n).padStart(2,'0');
+  return `最後更新：${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function switchListTab(kind,tab){
@@ -477,6 +494,8 @@ async function loadDutyList(){
     const snap=await getDocs(collection(window._db,'duty_briefs'));
     window._dutyDocs=[];
     snap.forEach(doc=>window._dutyDocs.push({id:doc.id,...doc.data()}));
+    const luEl=document.getElementById('duty-last-updated');
+    if(luEl)luEl.textContent=formatLastUpdated(computeLastUpdated(window._dutyDocs));
     renderDutyList();
   }catch(e){
     area.innerHTML=`<div class="pholder">載入失敗：${e.message}</div>`;
@@ -513,6 +532,7 @@ function renderDutyList(){
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
+      ${window._level==='S'?`<div style="margin-top:8px"><button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDutyItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button></div>`:''}
     </div>`;
   }).join('');
 }
@@ -525,6 +545,8 @@ async function loadNoticeList(){
     const snap=await getDocs(collection(window._db,'notices'));
     window._noticeDocs=[];
     snap.forEach(doc=>window._noticeDocs.push({id:doc.id,...doc.data()}));
+    const luEl=document.getElementById('notice-last-updated');
+    if(luEl)luEl.textContent=formatLastUpdated(computeLastUpdated(window._noticeDocs));
     renderNoticeList();
   }catch(e){
     area.innerHTML=`<div class="pholder">載入失敗：${e.message}</div>`;
@@ -563,6 +585,7 @@ function renderNoticeList(){
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
+      ${window._level==='S'?`<div style="margin-top:8px"><button class="btn btn-sm" style="color:#E24B4A" onclick='deleteNoticeItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button></div>`:''}
     </div>`;
   }).join('');
 }
@@ -591,8 +614,8 @@ async function loadReadmeReg() {
       area.innerHTML = '<div class="pholder" style="border:1px dashed #b5d4f4;color:#378ADD">尚未上傳，請至後臺控管 → 規章上傳</div>';
       return;
     }
-    let d;
-    snap.forEach(doc => { d = doc.data(); });
+    let d, docId;
+    snap.forEach(doc => { d = doc.data(); docId = doc.id; });
     area.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
         <i class="ti ti-file-type-pdf" style="font-size:28px;color:#E24B4A;flex-shrink:0"></i>
@@ -601,7 +624,7 @@ async function loadReadmeReg() {
           <div style="font-size:11px;color:var(--color-text-secondary, #6b6b67);margin-top:2px">版次 ${d.version||'—'} ／ 核決日期：${d.approvedDate||'—'} ／ ${d.fileName||''} (${d.fileSize ? (d.fileSize/1024).toFixed(0)+'KB' : ''})</div>
         </div>
         <div style="display:flex;gap:6px">
-          <a href="${d.fileUrl}" target="_blank" class="btn btn-primary btn-sm"><i class="ti ti-eye"></i> 線上查閱</a>
+          <button class="btn btn-primary btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(docId||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
           <a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>
         </div>
       </div>`;
@@ -647,6 +670,7 @@ function renderRegList(){
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.docNo ? `<button class="btn btn-sm" onclick="showVersionHistory('regulations','docNo','${d.docNo}','${escapeHtml(d.title||d.docNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
+      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteRegItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`).join('');
   area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
@@ -701,6 +725,7 @@ function renderFormList(){
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.formNo ? `<button class="btn btn-sm" onclick="showVersionHistory('forms','formNo','${d.formNo}','${escapeHtml(d.title||d.formNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
+      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteFormItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`).join('');
   area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
@@ -1101,6 +1126,50 @@ async function supersedeDoc(collectionName, docId, newDocId){
   await updateDoc(doc(window._db, collectionName, docId), {
     status: 'superseded', supersededAt: serverTimestamp(), supersededBy: newDocId || ''
   });
+}
+
+// ===== 軟刪除：標記status為deleted，不真正刪除資料，S級專用 =====
+async function softDelete(collectionName, docId){
+  const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  await updateDoc(doc(window._db, collectionName, docId), {
+    status: 'deleted', deletedAt: serverTimestamp(), deletedBy: window._uid || ''
+  });
+}
+async function deleteDutyItem(docId, title){
+  if(!confirm(`確定要刪除「${title||'此筆勤前指示'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
+  try{
+    await softDelete('duty_briefs', docId);
+    window._dutyDocs = (window._dutyDocs||[]).filter(d=>d.id!==docId);
+    renderDutyList();
+    showToast('已刪除');
+  }catch(e){ showToast('刪除失敗：'+e.message); }
+}
+async function deleteNoticeItem(docId, title){
+  if(!confirm(`確定要刪除「${title||'此筆通告'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
+  try{
+    await softDelete('notices', docId);
+    window._noticeDocs = (window._noticeDocs||[]).filter(d=>d.id!==docId);
+    renderNoticeList();
+    showToast('已刪除');
+  }catch(e){ showToast('刪除失敗：'+e.message); }
+}
+async function deleteRegItem(docId, title){
+  if(!confirm(`確定要刪除「${title||'此份規章'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
+  try{
+    await softDelete('regulations', docId);
+    window._regListDocs = (window._regListDocs||[]).filter(d=>d.id!==docId);
+    renderRegList();
+    showToast('已刪除');
+  }catch(e){ showToast('刪除失敗：'+e.message); }
+}
+async function deleteFormItem(docId, title){
+  if(!confirm(`確定要刪除「${title||'此份表單'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回）`)) return;
+  try{
+    await softDelete('forms', docId);
+    window._formListDocs = (window._formListDocs||[]).filter(d=>d.id!==docId);
+    renderFormList();
+    showToast('已刪除');
+  }catch(e){ showToast('刪除失敗：'+e.message); }
 }
 
 // ===== 歷史版本查詢：查出某文件編號/表單編號的所有版本（不限狀態） =====
