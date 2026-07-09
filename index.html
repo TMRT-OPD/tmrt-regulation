@@ -1814,7 +1814,12 @@ async function extractPdfText(file, maxPages, onProgress){
           }
         } else {
           const gap = item.transform[4] - (last.transform[4] + (last.width||0));
-          if(gap > (last.height||10)*0.28) pageText += ' ';
+          const charHeight = last.height||10;
+          if(gap > charHeight*2.5){
+            pageText += ' | '; // 同一行內間距明顯過大，很可能是表格欄位分隔，插入分隔符號方便辨識
+          } else if(gap > charHeight*0.28){
+            pageText += ' ';
+          }
         }
       }
       pageText += item.str;
