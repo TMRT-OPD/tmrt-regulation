@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 3</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 4</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -227,6 +227,18 @@ textarea{resize:vertical;min-height:80px}
   <div class="modal" style="width:700px;max-width:94vw">
     <div class="modal-hdr"><div class="modal-title" id="viewtext-modal-title">內文</div><button class="btn btn-sm" onclick="closeModal('modal-viewtext')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body" id="viewtext-modal-body"><div class="pholder">載入中…</div></div>
+  </div>
+</div>
+
+<!-- 編輯 Modal -->
+<div class="modal-bg" id="modal-edit">
+  <div class="modal" style="width:560px;max-width:94vw">
+    <div class="modal-hdr"><div class="modal-title" id="edit-modal-title">編輯</div><button class="btn btn-sm" onclick="closeModal('modal-edit')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body" id="edit-modal-body"></div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-edit')">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()"><i class="ti ti-check"></i> 儲存</button>
+    </div>
   </div>
 </div>
 
@@ -466,6 +478,13 @@ function formatLastUpdated(date){
   const pad=n=>String(n).padStart(2,'0');
   return `最後更新：${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+function lastUpdatedLine(d){
+  if(!d.updatedAt)return '';
+  const t=typeof d.updatedAt.toDate==='function'?d.updatedAt.toDate():null;
+  if(!t)return '';
+  const pad=n=>String(n).padStart(2,'0');
+  return `<div style="font-size:10.5px;color:var(--tt);margin-top:4px">最後更新：${escapeHtml(d.updatedByName||'—')}　${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}</div>`;
+}
 
 function switchListTab(kind,tab){
   const state=kind==='duty'?window._dutyState:window._noticeState;
@@ -539,7 +558,11 @@ function renderDutyList(){
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
-      ${window._level==='S'?`<div style="margin-top:8px"><button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDutyItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button></div>`:''}
+      ${lastUpdatedLine(d)}
+      ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn btn-sm" onclick='openEdit("duty",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDutyItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -596,7 +619,11 @@ function renderNoticeList(){
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
-      ${window._level==='S'?`<div style="margin-top:8px"><button class="btn btn-sm" style="color:#E24B4A" onclick='deleteNoticeItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button></div>`:''}
+      ${lastUpdatedLine(d)}
+      ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn btn-sm" onclick='openEdit("notice",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteNoticeItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -673,7 +700,7 @@ function renderRegList(){
   const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
   const rows = list.map(d => `<tr>
     <td><strong>${highlightText(d.docNo||'—',kw)}</strong></td>
-    <td>${highlightText(d.title||'—',kw)}</td>
+    <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}</td>
     <td><span class="badge" style="background:#e6f1fb;color:#0c447c">${tierLabels[d.tier]||'—'}</span></td>
     <td>版次 ${d.version||'—'}</td>
     <td>${d.approvedDate||'—'}</td>
@@ -681,6 +708,7 @@ function renderRegList(){
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.docNo ? `<button class="btn btn-sm" onclick="showVersionHistory('regulations','docNo','${d.docNo}','${escapeHtml(d.title||d.docNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
+      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("regulation",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
       ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteRegItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`).join('');
@@ -729,13 +757,14 @@ function renderFormList(){
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的表單</div>'; return; }
   const rows = list.map(d => `<tr>
     <td><strong>${highlightText(d.formNo||'—',kw)}</strong></td>
-    <td>${highlightText(d.title||'—',kw)}</td>
+    <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}</td>
     <td>${d.version?('版次 '+escapeHtml(d.version)):'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.formNo ? `<button class="btn btn-sm" onclick="showVersionHistory('forms','formNo','${d.formNo}','${escapeHtml(d.title||d.formNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
+      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("form",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
       ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteFormItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`).join('');
@@ -1152,6 +1181,127 @@ async function logActivity(kind, action, docId, title, extra){
       extra: extra||'', at: serverTimestamp()
     });
   }catch(e){ console.error('活動紀錄寫入失敗', e); }
+}
+
+// ===== 編輯功能：規章/表單/勤前/通告，S+A皆可 =====
+function openEdit(kind, docId){
+  let d;
+  if(kind==='duty') d=(window._dutyDocs||[]).find(x=>x.id===docId);
+  else if(kind==='notice') d=(window._noticeDocs||[]).find(x=>x.id===docId);
+  else if(kind==='regulation') d=(window._regListDocs||[]).find(x=>x.id===docId);
+  else if(kind==='form') d=(window._formListDocs||[]).find(x=>x.id===docId);
+  if(!d){ showToast('找不到資料，請重新整理後再試'); return; }
+  window._editContext={kind,docId};
+  const titleEl=document.getElementById('edit-modal-title');
+  const body=document.getElementById('edit-modal-body');
+  let html='';
+  if(kind==='duty'){
+    titleEl.textContent='編輯勤前指示';
+    html=`
+      <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">分類 *</label><select id="ed-category">${DUTY_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===d.category?'selected':''}>${c.name}</option>`).join('')}</select></div>
+        <div><label class="fl2">宣達者 *</label><input type="text" id="ed-announcer" value="${escapeHtml(d.announcer||'')}"></div>
+      </div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">發布日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
+        <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
+      </div>
+      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>`;
+  } else if(kind==='notice'){
+    titleEl.textContent='編輯通告';
+    html=`
+      <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">分類 *</label><select id="ed-category">${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===d.category?'selected':''}>${c.name}</option>`).join('')}</select></div>
+        <div></div>
+      </div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">生效日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
+        <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
+      </div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">是否展延</label><select id="ed-extended"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
+        <div><label class="fl2">修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
+      </div>
+      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>`;
+  } else if(kind==='regulation'){
+    titleEl.textContent='編輯規章資訊';
+    html=`
+      <div style="margin-bottom:12px"><label class="fl2">文件名稱 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
+      <div class="fg2" style="margin-bottom:12px">
+        <div><label class="fl2">文件位階</label><select id="ed-tier"><option value="1" ${d.tier===1?'selected':''}>第一階</option><option value="2" ${d.tier===2?'selected':''}>第二階</option><option value="3" ${d.tier===3?'selected':''}>第三階</option><option value="4" ${d.tier===4?'selected':''}>第四階</option></select></div>
+        <div><label class="fl2">版次</label><input type="text" id="ed-version" value="${escapeHtml(d.version||'')}"></div>
+      </div>
+      <div style="margin-bottom:12px"><label class="fl2">核決日期</label><input type="date" id="ed-approvedDate" value="${d.approvedDate||''}"></div>
+      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次</div>`;
+  } else if(kind==='form'){
+    titleEl.textContent='編輯表單資訊';
+    html=`
+      <div style="margin-bottom:12px"><label class="fl2">表單名稱 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
+      <div style="margin-bottom:12px"><label class="fl2">版次</label><input type="text" id="ed-version" value="${escapeHtml(d.version||'')}"></div>
+      <div style="margin-bottom:12px"><label class="fl2">核決日期</label><input type="date" id="ed-approvedDate" value="${d.approvedDate||''}"></div>
+      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次</div>`;
+  }
+  body.innerHTML=html;
+  document.getElementById('modal-edit').classList.add('open');
+}
+
+async function saveEdit(){
+  const ctx=window._editContext;
+  if(!ctx)return;
+  const {kind,docId}=ctx;
+  const title=document.getElementById('ed-title')?.value?.trim();
+  if(!title){ showToast('請輸入標題/名稱'); return; }
+  const btn=document.querySelector('#modal-edit .btn-primary');
+  setBtnLoading(btn,'儲存中…');
+  try{
+    const {doc,updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    let collectionName='', payload={title, updatedAt:serverTimestamp(), updatedBy:window._uid||'', updatedByName:window._displayName||''};
+    let localArr, renderFn;
+    if(kind==='duty'){
+      collectionName='duty_briefs';
+      payload.category=document.getElementById('ed-category')?.value||'';
+      payload.announcer=document.getElementById('ed-announcer')?.value?.trim()||'';
+      payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
+      payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
+      payload.content=document.getElementById('ed-content')?.value||'';
+      localArr=window._dutyDocs; renderFn=renderDutyList;
+    } else if(kind==='notice'){
+      collectionName='notices';
+      payload.category=document.getElementById('ed-category')?.value||'';
+      payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
+      payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
+      payload.extended=document.getElementById('ed-extended')?.value==='1';
+      payload.revised=document.getElementById('ed-revised')?.value==='1';
+      payload.content=document.getElementById('ed-content')?.value||'';
+      localArr=window._noticeDocs; renderFn=renderNoticeList;
+    } else if(kind==='regulation'){
+      collectionName='regulations';
+      payload.tier=parseInt(document.getElementById('ed-tier')?.value)||2;
+      payload.version=document.getElementById('ed-version')?.value?.trim()||'';
+      payload.approvedDate=document.getElementById('ed-approvedDate')?.value||'';
+      localArr=window._regListDocs; renderFn=renderRegList;
+    } else if(kind==='form'){
+      collectionName='forms';
+      payload.version=document.getElementById('ed-version')?.value?.trim()||'';
+      payload.approvedDate=document.getElementById('ed-approvedDate')?.value||'';
+      localArr=window._formListDocs; renderFn=renderFormList;
+    }
+    await updateDoc(doc(window._db,collectionName,docId),payload);
+    await logActivity(kind,'update',docId,title);
+    if(localArr){
+      const idx=localArr.findIndex(x=>x.id===docId);
+      if(idx>=0) Object.assign(localArr[idx],payload,{updatedAt:{toDate:()=>new Date()}});
+    }
+    setBtnSuccess(btn,'已儲存');
+    showToast('已更新');
+    closeModal('modal-edit');
+    if(renderFn) renderFn();
+  }catch(e){
+    setBtnError(btn);
+    showToast('儲存失敗：'+e.message);
+  }
 }
 
 async function softDelete(collectionName, docId){
