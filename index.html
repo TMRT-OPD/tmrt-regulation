@@ -164,7 +164,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 5</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 6</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1030,40 +1030,151 @@ function showFullTextFromRevise(i){
 }
 
 function pagePerm(){return`<div class="ptitle">後臺控管 — 系統權限管理</div><div class="psub">管理使用者帳號與權限等級（S 級限定）</div>
-<div class="tabs"><div class="tab active" onclick="switchTab(this,'tp-u')">帳號管理</div><div class="tab" onclick="switchTab(this,'tp-p')">權限對照表</div></div>
+<div class="tabs"><div class="tab active" onclick="switchTab(this,'tp-u')">帳號管理</div><div class="tab" onclick="switchTab(this,'tp-b')">批次匯入帳號</div><div class="tab" onclick="switchTab(this,'tp-p')">權限對照表</div></div>
 <div class="tabpane active" id="tp-u">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <div class="sb" style="flex:1;margin-bottom:0;margin-right:12px"><i class="ti ti-search"></i><input placeholder="搜尋員工編號或姓名" oninput="filterUsers(this.value)"></div>
     <button class="btn btn-primary" onclick="openAddModal()"><i class="ti ti-user-plus"></i> 新增帳號</button>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
-    <table class="vtbl"><thead><tr><th>員工編號</th><th>姓名</th><th>權限等級</th><th>建立時間</th><th>操作</th></tr></thead><tbody id="users-tbody"><tr><td colspan="5" class="empty">載入中…</td></tr></tbody></table>
+    <table class="vtbl"><thead><tr><th>員工編號</th><th>姓名</th><th>權限等級</th><th>建立時間</th><th>最後登入</th><th>操作</th></tr></thead><tbody id="users-tbody"><tr><td colspan="6" class="empty">載入中…</td></tr></tbody></table>
+  </div>
+</div>
+<div class="tabpane" id="tp-b">
+  <div class="card">
+    <div class="info-box"><i class="ti ti-info-circle"></i>試算表標題列請包含：員工編號、姓名、權限等級（S/A/B）、密碼（至少6碼）。匯入後建議請同仁儘速自行修改密碼</div>
+    <div style="margin-bottom:12px"><label class="fl2">Google Sheets 網址</label><input type="text" id="acc-sheet-url" placeholder="請貼上試算表網址"></div>
+    <div style="margin-bottom:12px"><label class="fl2">工作表名稱（若網址已含分頁代碼可不填）</label><input type="text" id="acc-sheet-name" placeholder="僅在網址無 gid 分頁代碼時作為備援"></div>
+    <div class="warn-box"><i class="ti ti-alert-triangle"></i>請確認試算表已設為「知道連結的人可以檢視」</div>
+    <button class="btn btn-primary" onclick="importAccountsFromSheets()"><i class="ti ti-table-import"></i> 連線比對並預覽</button>
+    <div id="acc-batch-preview" style="margin-top:14px"></div>
   </div>
 </div>
 <div class="tabpane" id="tp-p">
   <div class="card" style="padding:0;overflow:hidden"><table class="perm-tbl"><thead><tr><th>功能</th><th>S 級</th><th>A 級</th><th>B 級</th></tr></thead><tbody>
-    ${[['導讀/查詢/規章瀏覽',1,1,1],['效期內勤前瀏覽',1,1,1],['效期內通告瀏覽',1,1,1],['逾期勤前查詢',1,1,1],['逾期通告查詢',1,1,1],['新增勤前指示',1,1,0],['新增通告',1,1,0],['上傳規章',1,1,0],['規章修訂比對',1,1,0],['系統權限管理',1,0,0]].map(([n,s,a,b])=>`<tr><td>${n}</td><td>${s?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${a?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${b?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td></tr>`).join('')}
+    ${[['導讀/查詢/規章瀏覽',1,1,1],['效期內勤前瀏覽',1,1,1],['效期內通告瀏覽',1,1,1],['逾期勤前查詢',1,1,1],['逾期通告查詢',1,1,1],['新增勤前指示',1,1,0],['新增通告',1,1,0],['上傳規章',1,1,0],['編輯規章/表單/勤前/通告',1,1,0],['刪除資料',1,0,0],['規章修訂比對',1,1,0],['操作紀錄',1,0,0],['系統權限管理',1,0,0]].map(([n,s,a,b])=>`<tr><td>${n}</td><td>${s?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${a?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${b?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td></tr>`).join('')}
   </tbody></table></div>
 </div>`;}
+
+async function importAccountsFromSheets(){
+  const urlInput=document.getElementById('acc-sheet-url')?.value?.trim();
+  const sheetName=document.getElementById('acc-sheet-name')?.value?.trim();
+  const area=document.getElementById('acc-batch-preview');
+  if(!urlInput){showToast('請貼上 Google Sheets 網址');return;}
+  const m=urlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(!m){showToast('網址格式不正確，請貼上完整的 Google Sheets 網址');return;}
+  const sheetId=m[1];
+  const gidMatch=urlInput.match(/[#&]gid=(\d+)/);
+  const csvUrl=gidMatch
+    ? `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gidMatch[1]}`
+    : `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${sheetName?('&sheet='+encodeURIComponent(sheetName)):''}`;
+  area.innerHTML='<div class="pholder">連線中…</div>';
+  try{
+    const res=await fetch(csvUrl);
+    if(!res.ok) throw new Error('無法讀取試算表，請確認已設為「知道連結的人可以檢視」');
+    const text=await res.text();
+    const rows=parseCSV(text);
+    if(rows.length<2){area.innerHTML='<div class="pholder">試算表無資料</div>';return;}
+    const headers=rows[0].map(h=>(h||'').trim());
+    const idx=(aliases)=>headers.findIndex(h=>aliases.some(a=>h.includes(a)));
+    const iId=idx(['員工編號','工號']);
+    const iName=idx(['姓名']);
+    const iLevel=idx(['權限等級','等級','級']);
+    const iPwd=idx(['密碼']);
+    if(iId<0||iName<0){area.innerHTML='<div class="pholder">找不到「員工編號」或「姓名」欄位，請確認試算表標題列</div>';return;}
+    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap=await getDocs(collection(window._db,'users'));
+    const existIds=new Set();
+    snap.forEach(doc=>{const d=doc.data();if(d.id)existIds.add(String(d.id));});
+    const parsed=[];
+    for(let r=1;r<rows.length;r++){
+      const row=rows[r];
+      if(!row||row.every(c=>!c||!c.trim()))continue;
+      const empId=((iId>=0?row[iId]:'')||'').trim();
+      const name=((iName>=0?row[iName]:'')||'').trim();
+      let level=((iLevel>=0?row[iLevel]:'')||'').trim().toUpperCase();
+      if(!['S','A','B'].includes(level))level='B';
+      const pwd=((iPwd>=0?row[iPwd]:'')||'').trim();
+      if(!empId)continue;
+      parsed.push({empId,name,level,pwd,_dup:existIds.has(empId),_invalidPwd:!pwd||pwd.length<6});
+    }
+    if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
+    window._accBatchRows=parsed;
+    const dupCount=parsed.filter(p=>p._dup).length;
+    const invalidCount=parsed.filter(p=>!p._dup&&p._invalidPwd).length;
+    const importable=parsed.filter(p=>!p._dup&&!p._invalidPwd);
+    area.innerHTML=`
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆員工編號已存在（略過），${invalidCount} 筆缺密碼或密碼不足6碼（略過），${importable.length} 筆可匯入</div>
+      ${importable.length?`<div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
+        <table class="vtbl"><thead><tr><th>員工編號</th><th>姓名</th><th>權限等級</th><th>密碼</th></tr></thead>
+        <tbody>${parsed.map(p=>`<tr style="${p._dup||p._invalidPwd?'opacity:.4':''}"><td>${escapeHtml(p.empId)}${p._dup?' <span style="color:#856404">(已存在)</span>':''}${p._invalidPwd&&!p._dup?' <span style="color:#E24B4A">(密碼不足)</span>':''}</td><td>${escapeHtml(p.name)}</td><td><span class="badge lv-${p.level.toLowerCase()}">${p.level} 級</span></td><td>${p._dup||p._invalidPwd?'—':'••••••'}</td></tr>`).join('')}</tbody>
+        </table></div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmAccountBatchImport()"><i class="ti ti-check"></i> 確認匯入 ${importable.length} 個帳號</button>`
+      :'<div class="pholder">沒有可匯入的新帳號</div>'}
+    `;
+  }catch(e){
+    area.innerHTML=`<div class="pholder">連線失敗：${e.message}</div>`;
+  }
+}
+
+async function confirmAccountBatchImport(){
+  const rows=(window._accBatchRows||[]).filter(p=>!p._dup&&!p._invalidPwd);
+  if(rows.length===0)return;
+  const area=document.getElementById('acc-batch-preview');
+  const btn=area.querySelector('.btn-primary');
+  setBtnLoading(btn,`建立中…(0/${rows.length})`);
+  let ok=0, fail=0;
+  try{
+    const {initializeApp,deleteApp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const {getAuth,createUserWithEmailAndPassword}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    const {doc,setDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const secondaryApp=initializeApp(window._fbConfig,'secondary-batch-'+Date.now());
+    const secondaryAuth=getAuth(secondaryApp);
+    try{
+      for(let i=0;i<rows.length;i++){
+        const p=rows[i];
+        try{
+          const email='tcm'+p.empId+'@tmrt.com.tw';
+          const cred=await createUserWithEmailAndPassword(secondaryAuth,email,p.pwd);
+          await setDoc(doc(window._db,'users',cred.user.uid),{id:p.empId,name:p.name,level:p.level,email,createdAt:serverTimestamp()});
+          ok++;
+        }catch(e){ fail++; }
+        if(btn) btn.innerHTML=`<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 建立中…(${i+1}/${rows.length})`;
+      }
+    }finally{
+      await deleteApp(secondaryApp);
+    }
+    setBtnSuccess(btn,'已完成');
+    await logActivity('user','batch_create','',`批次匯入 ${ok} 個帳號`,fail?`${fail}筆失敗`:'');
+    showToast(`已建立 ${ok} 個帳號${fail?`，${fail} 個失敗`:''}`);
+    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>批次匯入完成：成功 ${ok} 個${fail?`，失敗 ${fail} 個（可能是員工編號格式不合法或其他錯誤）`:''}</div>`;
+    window._accBatchRows=[];
+    loadUsers();
+  }catch(e){
+    setBtnError(btn);
+    showToast('批次匯入失敗：'+e.message);
+  }
+}
 
 function initPermPage(){loadUsers();}
 
 async function loadUsers(){
   const tbody=document.getElementById('users-tbody');if(!tbody)return;
-  if(!window._db){tbody.innerHTML='<tr><td colspan="5" class="empty">資料庫未連線</td></tr>';return}
+  if(!window._db){tbody.innerHTML='<tr><td colspan="6" class="empty">資料庫未連線</td></tr>';return}
   try{
     const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const snap=await getDocs(collection(window._db,'users'));
-    if(snap.empty){tbody.innerHTML='<tr><td colspan="5" class="empty">尚無帳號資料</td></tr>';return}
+    if(snap.empty){tbody.innerHTML='<tr><td colspan="6" class="empty">尚無帳號資料</td></tr>';return}
     tbody.innerHTML='';
     snap.forEach(d=>{
       const data=d.data();const isSelf=d.id===window._uid;
       const tr=document.createElement('tr');tr.dataset.uid=d.id;const _empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):'');tr.dataset.search=_empId+(data.name||'');
       const empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):d.id);
-      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${(data.level||'B').toLowerCase()}">${data.level||'B'} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${data.level||'B'}')"><i class="ti ti-edit"></i> 編輯</button>${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
+      const lastLogin=data.lastLoginAt&&typeof data.lastLoginAt.toDate==='function'?data.lastLoginAt.toDate().toLocaleString('zh-TW',{hour12:false}):'從未登入';
+      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${(data.level||'B').toLowerCase()}">${data.level||'B'} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${data.level||'B'}')"><i class="ti ti-edit"></i> 編輯</button>${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
       tbody.appendChild(tr);
     });
-  }catch(e){tbody.innerHTML=`<tr><td colspan="5" class="empty">載入失敗：${e.message}</td></tr>`;}
+  }catch(e){tbody.innerHTML=`<tr><td colspan="6" class="empty">載入失敗：${e.message}</td></tr>`;}
 }
 
 function filterUsers(q){document.querySelectorAll('#users-tbody tr').forEach(tr=>{tr.style.display=q?(tr.dataset.search||'').includes(q)?'':'none':'';}); }
@@ -2011,7 +2122,7 @@ function pageActivityLog(){return`<div class="ptitle">後臺控管 — 操作紀
 <div style="text-align:center;margin-top:12px"><button class="btn" id="log-more-btn" style="display:none" onclick="loadActivityLog(false)"><i class="ti ti-chevron-down"></i> 載入更多</button></div>`;}
 
 const LOG_ACTION_LABEL={create:'新增',update:'編輯／取代',delete:'刪除',supersede:'下架舊版',batch_create:'批次上傳'};
-const LOG_KIND_LABEL={duty:'勤前指示',notice:'通告',regulation:'規章',form:'表單'};
+const LOG_KIND_LABEL={duty:'勤前指示',notice:'通告',regulation:'規章',form:'表單',user:'帳號'};
 async function loadActivityLog(reset){
   const area=document.getElementById('log-list-area');
   if(!area)return;
