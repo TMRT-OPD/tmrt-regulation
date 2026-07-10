@@ -1169,15 +1169,25 @@ async function loadUsers(){
     const snap=await getDocs(collection(window._db,'users'));
     if(snap.empty){tbody.innerHTML='<tr><td colspan="7" class="empty">尚無帳號資料</td></tr>';return}
     tbody.innerHTML='';
-    snap.forEach(d=>{
-      const data=d.data();const isSelf=d.id===window._uid;
-      const tr=document.createElement('tr');tr.dataset.uid=d.id;const _empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):'');tr.dataset.search=_empId+(data.name||'');
-      const empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):d.id);
+    const levelRank={S:0,A:1,B:2};
+    const rows=[];
+    snap.forEach(d=>rows.push({id:d.id,data:d.data()}));
+    rows.sort((x,y)=>{
+      const lx=x.data.level||'B',ly=y.data.level||'B';
+      const rx=levelRank[lx]??3,ry=levelRank[ly]??3;
+      if(rx!==ry)return rx-ry;
+      const ex=x.data.id||x.id,ey=y.data.id||y.id;
+      return String(ex).localeCompare(String(ey));
+    });
+    rows.forEach(({id,data})=>{
+      const isSelf=id===window._uid;
+      const tr=document.createElement('tr');tr.dataset.uid=id;const _empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):'');tr.dataset.search=_empId+(data.name||'');
+      const empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):id);
       const lastLogin=data.lastLoginAt&&typeof data.lastLoginAt.toDate==='function'?data.lastLoginAt.toDate().toLocaleString('zh-TW',{hour12:false}):'從未登入';
       const lvl=data.level||'B';
       const ipCell=lvl==='S'?'<span style="color:var(--ts)">不限制</span>':(data.boundIP?data.boundIP:'<span style="color:var(--ts)">尚未綁定</span>');
-      const unbindBtn=(lvl!=='S'&&data.boundIP)?`<button class="btn btn-sm" title="解除IP綁定" onclick="unbindIP('${d.id}','${empId}')"><i class="ti ti-shield-off"></i></button>`:'';
-      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${lvl.toLowerCase()}">${lvl} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="font-size:11px">${ipCell}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${lvl}')"><i class="ti ti-edit"></i> 編輯</button>${unbindBtn}${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
+      const unbindBtn=(lvl!=='S'&&data.boundIP)?`<button class="btn btn-sm" title="解除IP綁定" onclick="unbindIP('${id}','${empId}')"><i class="ti ti-shield-off"></i></button>`:'';
+      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${lvl.toLowerCase()}">${lvl} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="font-size:11px">${ipCell}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${id}','${data.id}','${data.name||''}','${lvl}')"><i class="ti ti-edit"></i> 編輯</button>${unbindBtn}${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
       tbody.appendChild(tr);
     });
   }catch(e){tbody.innerHTML=`<tr><td colspan="7" class="empty">載入失敗：${e.message}</td></tr>`;}
