@@ -2617,56 +2617,72 @@ function watchSession(uid){
 }
 onAuthStateChanged(auth,async(user)=>{
   if(user){
-    const ud=await getDoc(doc(db,'users',user.uid));const d=ud.exists()?ud.data():{};const level=d.level||'B';
-    // ===== IP 綁定防護（S 級排除）=====
-    if(level!=='S'){
-      let curIP='';
-      try{const r=await fetch('https://api.ipify.org?format=json');const j=await r.json();curIP=j.ip||'';}catch(e){curIP='';}
-      const {updateDoc}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-      if(curIP){
-        if(!d.boundIP){
-          // 首次登入，自動綁定目前 IP
-          await updateDoc(doc(db,'users',user.uid),{boundIP:curIP});
-          d.boundIP=curIP;
-        }else if(d.boundIP!==curIP){
-          const errEl=document.getElementById('l-err'),btn=document.getElementById('lbtn');
-          errEl.innerHTML='<i class="ti ti-alert-circle"></i> 此帳號已綁定其他裝置／網路環境，如需異地使用請聯繫 S 級管理員解除綁定';
-          btn.textContent='登入';btn.disabled=false;
-          window._isFreshLogin=false;
-          await signOut(auth);
-          return;
+    try{
+      const ud=await getDoc(doc(db,'users',user.uid));const d=ud.exists()?ud.data():{};const level=d.level||'B';
+      // ===== IP 綁定防護（S 級排除）=====
+      if(level!=='S'){
+        let curIP='';
+        try{const r=await fetch('https://api.ipify.org?format=json');const j=await r.json();curIP=j.ip||'';}catch(e){curIP='';}
+        if(curIP){
+          try{
+            const {updateDoc}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+            if(!d.boundIP){
+              // 首次登入，自動綁定目前 IP
+              await updateDoc(doc(db,'users',user.uid),{boundIP:curIP});
+              d.boundIP=curIP;
+            }else if(d.boundIP!==curIP){
+              const errEl=document.getElementById('l-err'),btn=document.getElementById('lbtn');
+              errEl.innerHTML='<i class="ti ti-alert-circle"></i> 此帳號已綁定其他裝置／網路環境，如需異地使用請聯繫 S 級管理員解除綁定';
+              btn.textContent='登入';btn.disabled=false;
+              window._isFreshLogin=false;
+              await signOut(auth);
+              return;
+            }
+          }catch(ipErr){
+            // 寫入 boundIP 失敗（例如 Firestore 規則尚未開放此欄位），暫時放行避免卡死登入，僅記錄於console供排查
+            console.warn('IP 綁定寫入失敗，本次登入暫不強制：',ipErr);
+          }
         }
       }
-    }
-    window._level=level;
-    window._uid=user.uid;
-    const displayId=user.email.replace('tcm','').replace('@tmrt.com.tw','');
-    window._displayName=d.name||displayId;
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-screen').style.display='flex';
-    document.getElementById('uid-disp').textContent=d.name||displayId;
-    const badge=document.getElementById('lv-badge');badge.textContent=level+'級';badge.className='badge lv-'+level.toLowerCase();
-    if(level==='S'||level==='A'){document.getElementById('nsec-admin').style.display='';document.getElementById('ni-admin').style.display='flex';document.getElementById('sub-admin').style.display='none';}
-    if(level==='S'){document.getElementById('nch-perm').style.display='';document.getElementById('nch-log').style.display='';}
-    if(level==='S'){
-      // S 級排除單一登入防護，可多裝置/多分頁同時登入，僅記錄最後登入時間
-      const {updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-      await updateDoc(doc(db,'users',user.uid),{lastLoginAt:serverTimestamp()});
-    }else{
-      await claimSession(user.uid);
-      watchSession(user.uid);
-    }
-    buildRegTree();
-    buildFormTree();
-    if(window._isFreshLogin){
-      window._isFreshLogin=false;
-      try{sessionStorage.removeItem('lastRoute');}catch(e){}
-      gp('readme',document.querySelector('.ni'));
-    }else{
-      let restored=null;
-      try{ const saved=sessionStorage.getItem('lastRoute'); if(saved) restored=JSON.parse(saved); }catch(e){}
-      if(restored&&restored.key){ gp(restored.key,null,restored.param); }
-      else{ gp('readme',document.querySelector('.ni')); }
+      window._level=level;
+      window._uid=user.uid;
+      const displayId=user.email.replace('tcm','').replace('@tmrt.com.tw','');
+      window._displayName=d.name||displayId;
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app-screen').style.display='flex';
+      document.getElementById('uid-disp').textContent=d.name||displayId;
+      const badge=document.getElementById('lv-badge');badge.textContent=level+'級';badge.className='badge lv-'+level.toLowerCase();
+      if(level==='S'||level==='A'){document.getElementById('nsec-admin').style.display='';document.getElementById('ni-admin').style.display='flex';document.getElementById('sub-admin').style.display='none';}
+      if(level==='S'){document.getElementById('nch-perm').style.display='';document.getElementById('nch-log').style.display='';}
+      try{
+        if(level==='S'){
+          // S 級排除單一登入防護，可多裝置/多分頁同時登入，僅記錄最後登入時間
+          const {updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+          await updateDoc(doc(db,'users',user.uid),{lastLoginAt:serverTimestamp()});
+        }else{
+          await claimSession(user.uid);
+          watchSession(user.uid);
+        }
+      }catch(sessErr){
+        console.warn('登入紀錄寫入失敗，不影響本次登入：',sessErr);
+      }
+      buildRegTree();
+      buildFormTree();
+      if(window._isFreshLogin){
+        window._isFreshLogin=false;
+        try{sessionStorage.removeItem('lastRoute');}catch(e){}
+        gp('readme',document.querySelector('.ni'));
+      }else{
+        let restored=null;
+        try{ const saved=sessionStorage.getItem('lastRoute'); if(saved) restored=JSON.parse(saved); }catch(e){}
+        if(restored&&restored.key){ gp(restored.key,null,restored.param); }
+        else{ gp('readme',document.querySelector('.ni')); }
+      }
+    }catch(fatalErr){
+      console.error('登入後處理發生錯誤：',fatalErr);
+      const errEl=document.getElementById('l-err'),btn=document.getElementById('lbtn');
+      if(errEl)errEl.innerHTML='<i class="ti ti-alert-circle"></i> 登入處理發生錯誤，請重新整理頁面後再試一次';
+      if(btn){btn.textContent='登入';btn.disabled=false;}
     }
   }else{
     if(_sessionUnsub){_sessionUnsub();_sessionUnsub=null;}
