@@ -257,7 +257,7 @@ const regTree={
 function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','reg-unit');}
 function buildFormTree(){const c=document.getElementById('sub-form');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','form-unit');}
 function flattenTreeLeaves(node){let out=[];for(const key in node){const ch=node[key];if(ch)out=out.concat(flattenTreeLeaves(ch));else out.push(key);}return out;}
-const SEARCH_EXTRA_UNITS=['站務中心','北段辦','南段辦'];
+const SEARCH_EXTRA_UNITS=['運務處','行控中心','站務中心','票務中心','維修處','工安處','北段辦','南段辦'];
 function searchDeptOptions(){
   const leaves=[];
   flattenTreeLeaves(regTree).forEach(u=>{ if(!leaves.includes(u)) leaves.push(u); });
@@ -539,6 +539,28 @@ const NOTICE_CATEGORIES=[
   {id:'ext_hq',name:'外單位通告－處本部',bg:'#e2d9f3',text:'#3c2a6e'},
   {id:'ext_maint',name:'外單位通告－維修處',bg:'#e2d9f3',text:'#3c2a6e'}
 ];
+const NOTICE_DEPTS=['運務處','行控中心','站務中心','票務中心','維修處','工安處'];
+function unitSelectHtml(id,list,current){
+  const cur=current||'';
+  const isOther=cur&&!list.includes(cur);
+  return `<select id="${id}" onchange="toggleOtherUnit('${id}')">
+    <option value="">請選擇發布單位</option>
+    ${list.map(u=>`<option value="${escapeHtml(u)}" ${u===cur?'selected':''}>${escapeHtml(u)}</option>`).join('')}
+    <option value="__other__" ${isOther?'selected':''}>其他（手動輸入）</option>
+  </select>
+  <input type="text" id="${id}-other" placeholder="請輸入單位名稱" style="margin-top:6px;${isOther?'':'display:none'}" value="${isOther?escapeHtml(cur):''}">`;
+}
+function toggleOtherUnit(id){
+  const sel=document.getElementById(id),other=document.getElementById(id+'-other');
+  if(!sel||!other)return;
+  other.style.display=sel.value==='__other__'?'':'none';
+}
+function getUnitValue(id){
+  const sel=document.getElementById(id);
+  if(!sel)return '';
+  if(sel.value==='__other__')return document.getElementById(id+'-other')?.value?.trim()||'';
+  return sel.value;
+}
 function escapeHtml(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function isValidDate(s){return !!(s && /^\d{4}-\d{2}-\d{2}$/.test(s));}
 function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
@@ -941,7 +963,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
 function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告上傳</div><div class="psub">發布通告，將列入效期內通告頁面</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'nb-m')">手動新增</div><div class="tab" onclick="switchTab(this,'nb-b')">批次上傳（資料夾）</div></div>
 <div class="tabpane active" id="nb-m"><div class="card">
-  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div><div></div></div>
+  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div><div><label class="fl2">發布單位</label>${unitSelectHtml('nu',NOTICE_DEPTS,'')}</div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">分類 *</label><select id="ncat"><option value="">請選擇分類</option>${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">生效日期 *</label><input type="date" id="nf"></div><div><label class="fl2">到期日期 *</label><input type="date" id="ne"></div></div>
   <div class="fg2" style="margin-bottom:12px">
@@ -1396,6 +1418,7 @@ async function saveNotice() {
     }
     const newRef = await addDoc(collection(window._db, 'notices'), {
       title, category,
+      unit: getUnitValue('nu'),
       issuedDate: fromDate,
       expiryDate: toDate,
       extended: document.getElementById('nx')?.value === '1',
@@ -1405,10 +1428,12 @@ async function saveNotice() {
       attachments, status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
-    await logActivity('notice','create',newRef.id,title);
+    await logActivity('notice','create',newRef.id,title,'',getUnitValue('nu'));
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
     ['nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
+    const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const ncatEl = document.getElementById('ncat'); if (ncatEl) ncatEl.value = '';
     const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
@@ -1480,7 +1505,7 @@ function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">分類 *</label><select id="ed-category">${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===d.category?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div></div>
+        <div><label class="fl2">發布單位</label>${unitSelectHtml('ed-unit',NOTICE_DEPTS,d.unit||'')}</div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">生效日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
@@ -1536,6 +1561,7 @@ async function saveEdit(){
     } else if(kind==='notice'){
       collectionName='notices';
       payload.category=document.getElementById('ed-category')?.value||'';
+      payload.unit=getUnitValue('ed-unit');
       payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
       payload.extended=document.getElementById('ed-extended')?.value==='1';
@@ -1555,7 +1581,7 @@ async function saveEdit(){
       localArr=window._formListDocs; renderFn=renderFormList;
     }
     await updateDoc(doc(window._db,collectionName,docId),payload);
-    const deptForLog=(localArr||[]).find(x=>x.id===docId)?.dept||'';
+    const deptForLog = kind==='notice' ? payload.unit : ((localArr||[]).find(x=>x.id===docId)?.dept||'');
     await logActivity(kind,'update',docId,title,'',deptForLog);
     if(localArr){
       const idx=localArr.findIndex(x=>x.id===docId);
