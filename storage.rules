@@ -2,9 +2,11 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      // 登入即可讀取（查閱/下載檔案）
-      allow read: if request.auth != null;
-      // 寫入（上傳/覆蓋/刪除檔案）僅限 S 級或 A 級帳號，比照 Firestore 規則
+      // 讀取（查閱原始檔案/下載）僅限 S 級或 A 級帳號（B 級僅能透過系統內建的「查閱全文」看擷取後的文字，不開放原始檔案存取）
+      allow read: if request.auth != null &&
+        (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.level == 'S'
+        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.level == 'A');
+      // 寫入（上傳/覆蓋/刪除檔案）僅限 S 級或 A 級帳號
       allow write: if request.auth != null &&
         (firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.level == 'S'
         || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.level == 'A');

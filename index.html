@@ -142,7 +142,7 @@ textarea{resize:vertical;min-height:80px}
     <div class="nsec">查詢</div>
     <div class="ni" onclick="gp('readme',this)"><i class="ti ti-book"></i>導讀</div>
     <div class="ni" onclick="gp('search',this)"><i class="ti ti-search"></i>綜合查詢</div>
-    <div class="nsec">指示與通告</div>
+    <div class="nsec">勤前指示與通告</div>
     <div class="ni" onclick="gp('duty',this)"><i class="ti ti-bell"></i>勤前指示</div>
     <div class="ni" onclick="gp('notice',this)"><i class="ti ti-speakerphone"></i>通告</div>
     <div class="nsec">規章</div>
@@ -150,6 +150,7 @@ textarea{resize:vertical;min-height:80px}
     <div class="nc" id="sub-reg"></div>
     <div class="ni" onclick="toggleSub('sub-form',this)"><i class="ti ti-file-text"></i>表單<i class="ti ti-chevron-right na"></i></div>
     <div class="nc" id="sub-form"></div>
+    <div class="nsec">密碼</div>
     <div class="ni" onclick="openChangePwd()"><i class="ti ti-key"></i>修改密碼</div>
     <div class="nsec" id="nsec-admin" style="display:none">後臺</div>
     <div class="ni" id="ni-admin" onclick="toggleSub('sub-admin',this)" style="display:none"><i class="ti ti-settings"></i>後臺控管<i class="ti ti-chevron-right na"></i></div>
@@ -751,7 +752,7 @@ async function loadReadmeReg() {
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-primary btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(docId||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
-          <a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>
+          ${(window._level==='S'||window._level==='A')?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
         </div>
       </div>`;
   } catch(e) {
@@ -794,7 +795,7 @@ function renderRegList(){
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
-      ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+      ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.docNo ? `<button class="btn btn-sm" onclick="showVersionHistory('regulations','docNo','${d.docNo}','${escapeHtml(d.title||d.docNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
       ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("regulation",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
       ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteRegItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
@@ -850,7 +851,7 @@ function renderFormList(){
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
       ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
-      ${d.fileUrl ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
+      ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.formNo ? `<button class="btn btn-sm" onclick="showVersionHistory('forms','formNo','${d.formNo}','${escapeHtml(d.title||d.formNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
       ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("form",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
       ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteFormItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
@@ -1038,7 +1039,7 @@ function pagePerm(){return`<div class="ptitle">後臺控管 — 系統權限管�
     <button class="btn btn-primary" onclick="openAddModal()"><i class="ti ti-user-plus"></i> 新增帳號</button>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
-    <table class="vtbl"><thead><tr><th>員工編號</th><th>姓名</th><th>權限等級</th><th>建立時間</th><th>最後登入</th><th>操作</th></tr></thead><tbody id="users-tbody"><tr><td colspan="6" class="empty">載入中…</td></tr></tbody></table>
+    <table class="vtbl"><thead><tr><th>員工編號</th><th>姓名</th><th>權限等級</th><th>建立時間</th><th>最後登入</th><th>綁定 IP</th><th>操作</th></tr></thead><tbody id="users-tbody"><tr><td colspan="7" class="empty">載入中…</td></tr></tbody></table>
   </div>
 </div>
 <div class="tabpane" id="tp-b">
@@ -1053,7 +1054,8 @@ function pagePerm(){return`<div class="ptitle">後臺控管 — 系統權限管�
 </div>
 <div class="tabpane" id="tp-p">
   <div class="card" style="padding:0;overflow:hidden"><table class="perm-tbl"><thead><tr><th>功能</th><th>S 級</th><th>A 級</th><th>B 級</th></tr></thead><tbody>
-    ${[['導讀/查詢/規章瀏覽',1,1,1],['效期內勤前瀏覽',1,1,1],['效期內通告瀏覽',1,1,1],['逾期勤前查詢',1,1,1],['逾期通告查詢',1,1,1],['新增勤前指示',1,1,0],['新增通告',1,1,0],['上傳規章',1,1,0],['編輯規章/表單/勤前/通告',1,1,0],['刪除資料',1,0,0],['規章修訂比對',1,1,0],['操作紀錄',1,0,0],['系統權限管理',1,0,0]].map(([n,s,a,b])=>`<tr><td>${n}</td><td>${s?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${a?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${b?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td></tr>`).join('')}
+    ${[['導讀/綜合查詢/規章表單瀏覽',1,1,1],['效期內勤前瀏覽',1,1,1],['效期內通告瀏覽',1,1,1],['逾期勤前查詢',1,1,1],['逾期通告查詢',1,1,1],['查閱全文',1,1,1],['歷史版本查詢',1,1,1],['下載原始檔案',1,1,0],['新增勤前指示',1,1,0],['新增通告',1,1,0],['上傳規章/表單',1,1,0],['編輯規章/表單/勤前/通告',1,1,0],['刪除資料',1,0,0],['規章修訂比對',1,1,0],['操作紀錄查詢',1,0,0],['系統權限管理（帳號管理）',1,0,0]].map(([n,s,a,b])=>`<tr><td>${n}</td><td>${s?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${a?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td><td>${b?'<i class="ti ti-check pck"></i>':'<i class="ti ti-x pcx"></i>'}</td></tr>`).join('')}
+  <tr style="background:#fafbfa"><td colspan="4" style="font-size:11px;color:var(--ts);padding:10px 12px">B 級僅能查閱全文與歷史版本，不開放下載、編輯、刪除（此表若有異動，皆會先與 S 級確認後再一併調整功能與此對照表）</td></tr>
   </tbody></table></div>
 </div>`;}
 
@@ -1161,21 +1163,28 @@ function initPermPage(){loadUsers();}
 
 async function loadUsers(){
   const tbody=document.getElementById('users-tbody');if(!tbody)return;
-  if(!window._db){tbody.innerHTML='<tr><td colspan="6" class="empty">資料庫未連線</td></tr>';return}
+  if(!window._db){tbody.innerHTML='<tr><td colspan="7" class="empty">資料庫未連線</td></tr>';return}
   try{
     const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const snap=await getDocs(collection(window._db,'users'));
-    if(snap.empty){tbody.innerHTML='<tr><td colspan="6" class="empty">尚無帳號資料</td></tr>';return}
+    if(snap.empty){tbody.innerHTML='<tr><td colspan="7" class="empty">尚無帳號資料</td></tr>';return}
     tbody.innerHTML='';
     snap.forEach(d=>{
       const data=d.data();const isSelf=d.id===window._uid;
       const tr=document.createElement('tr');tr.dataset.uid=d.id;const _empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):'');tr.dataset.search=_empId+(data.name||'');
       const empId=data.id||(data.email?data.email.replace('tcm','').replace('@tmrt.com.tw',''):d.id);
       const lastLogin=data.lastLoginAt&&typeof data.lastLoginAt.toDate==='function'?data.lastLoginAt.toDate().toLocaleString('zh-TW',{hour12:false}):'從未登入';
-      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${(data.level||'B').toLowerCase()}">${data.level||'B'} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${data.level||'B'}')"><i class="ti ti-edit"></i> 編輯</button>${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
+      const lvl=data.level||'B';
+      const ipCell=lvl==='S'?'<span style="color:var(--ts)">不限制</span>':(data.boundIP?data.boundIP:'<span style="color:var(--ts)">尚未綁定</span>');
+      const unbindBtn=(lvl!=='S'&&data.boundIP)?`<button class="btn btn-sm" title="解除IP綁定" onclick="unbindIP('${d.id}','${empId}')"><i class="ti ti-shield-off"></i></button>`:'';
+      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td><span class="badge lv-${lvl.toLowerCase()}">${lvl} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="font-size:11px">${ipCell}</td><td style="display:flex;gap:6px"><button class="btn btn-sm" onclick="editAcc('${d.id}','${data.id}','${data.name||''}','${lvl}')"><i class="ti ti-edit"></i> 編輯</button>${unbindBtn}${!isSelf?`<button class="btn btn-sm btn-danger" onclick="deleteAcc('${d.id}','${data.id||''}')"><i class="ti ti-trash"></i> 刪除</button>`:''}</td>`;
       tbody.appendChild(tr);
     });
-  }catch(e){tbody.innerHTML=`<tr><td colspan="6" class="empty">載入失敗：${e.message}</td></tr>`;}
+  }catch(e){tbody.innerHTML=`<tr><td colspan="7" class="empty">載入失敗：${e.message}</td></tr>`;}
+}
+async function unbindIP(uid,empId){
+  if(!confirm(`確定要解除員工編號 ${empId} 的 IP 綁定嗎？\n（該帳號下次登入時將自動重新綁定當下的 IP）`))return;
+  try{const {doc,updateDoc,deleteField}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");await updateDoc(doc(window._db,'users',uid),{boundIP:deleteField()});showToast('已解除 IP 綁定');loadUsers();}catch(e){showToast('解除失敗：'+e.message);}
 }
 
 function filterUsers(q){document.querySelectorAll('#users-tbody tr').forEach(tr=>{tr.style.display=q?(tr.dataset.search||'').includes(q)?'':'none':'';}); }
@@ -1580,7 +1589,7 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
         <div style="font-size:12px;color:var(--ts)">核決日期：${d.approvedDate||'—'}${d.fileName?'　檔名：'+escapeHtml(d.fileName):''}</div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, ${JSON.stringify(collectionName)}, ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
-          ${d.fileUrl?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
+          ${(d.fileUrl&&(window._level==='S'||window._level==='A'))?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
         </div>
       </div>`;
     }).join('');
@@ -1595,8 +1604,9 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId)
   const body = document.getElementById('viewtext-modal-body');
   if (titleEl) titleEl.textContent = title || '內文';
   if (body) {
-    const pdfLink = fileUrl ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
-    const canReextract = collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
+    const canAccessFile = (window._level==='S'||window._level==='A');
+    const pdfLink = (fileUrl && canAccessFile) ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
+    const canReextract = canAccessFile && collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
     const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
     if (!fullText || !fullText.trim()) {
       body.innerHTML = `${pdfLink}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${reextractBtn}`;
@@ -2607,7 +2617,28 @@ function watchSession(uid){
 }
 onAuthStateChanged(auth,async(user)=>{
   if(user){
-    const ud=await getDoc(doc(db,'users',user.uid));const d=ud.exists()?ud.data():{};const level=d.level||'B';window._level=level;
+    const ud=await getDoc(doc(db,'users',user.uid));const d=ud.exists()?ud.data():{};const level=d.level||'B';
+    // ===== IP 綁定防護（S 級排除）=====
+    if(level!=='S'){
+      let curIP='';
+      try{const r=await fetch('https://api.ipify.org?format=json');const j=await r.json();curIP=j.ip||'';}catch(e){curIP='';}
+      const {updateDoc}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      if(curIP){
+        if(!d.boundIP){
+          // 首次登入，自動綁定目前 IP
+          await updateDoc(doc(db,'users',user.uid),{boundIP:curIP});
+          d.boundIP=curIP;
+        }else if(d.boundIP!==curIP){
+          const errEl=document.getElementById('l-err'),btn=document.getElementById('lbtn');
+          errEl.innerHTML='<i class="ti ti-alert-circle"></i> 此帳號已綁定其他裝置／網路環境，如需異地使用請聯繫 S 級管理員解除綁定';
+          btn.textContent='登入';btn.disabled=false;
+          window._isFreshLogin=false;
+          await signOut(auth);
+          return;
+        }
+      }
+    }
+    window._level=level;
     window._uid=user.uid;
     const displayId=user.email.replace('tcm','').replace('@tmrt.com.tw','');
     window._displayName=d.name||displayId;
@@ -2617,8 +2648,14 @@ onAuthStateChanged(auth,async(user)=>{
     const badge=document.getElementById('lv-badge');badge.textContent=level+'級';badge.className='badge lv-'+level.toLowerCase();
     if(level==='S'||level==='A'){document.getElementById('nsec-admin').style.display='';document.getElementById('ni-admin').style.display='flex';document.getElementById('sub-admin').style.display='none';}
     if(level==='S'){document.getElementById('nch-perm').style.display='';document.getElementById('nch-log').style.display='';}
-    await claimSession(user.uid);
-    watchSession(user.uid);
+    if(level==='S'){
+      // S 級排除單一登入防護，可多裝置/多分頁同時登入，僅記錄最後登入時間
+      const {updateDoc,serverTimestamp}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      await updateDoc(doc(db,'users',user.uid),{lastLoginAt:serverTimestamp()});
+    }else{
+      await claimSession(user.uid);
+      watchSession(user.uid);
+    }
     buildRegTree();
     buildFormTree();
     if(window._isFreshLogin){
