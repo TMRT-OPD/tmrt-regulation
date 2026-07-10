@@ -257,10 +257,11 @@ const regTree={
 function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','reg-unit');}
 function buildFormTree(){const c=document.getElementById('sub-form');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','form-unit');}
 function flattenTreeLeaves(node){let out=[];for(const key in node){const ch=node[key];if(ch)out=out.concat(flattenTreeLeaves(ch));else out.push(key);}return out;}
+const SEARCH_EXTRA_UNITS=['站務中心','北段辦','南段辦'];
 function searchDeptOptions(){
-  const leaves=Array.from(new Set(flattenTreeLeaves(regTree)));
-  const units=Array.from(new Set([...(typeof DUTY_UNITS!=='undefined'?DUTY_UNITS:[]),...(typeof NOTICE_DEPTS!=='undefined'?NOTICE_DEPTS:[])]));
-  return Array.from(new Set([...leaves,...units])).sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  const leaves=[];
+  flattenTreeLeaves(regTree).forEach(u=>{ if(!leaves.includes(u)) leaves.push(u); });
+  return [...leaves, ...SEARCH_EXTRA_UNITS];
 }
 function buildBranch(node,container,path,pageKey){pageKey=pageKey||'reg-unit';for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s';t.appendChild(document.createTextNode(key));t.appendChild(ic);const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';t.onclick=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};buildBranch(ch,s,fp,pageKey);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp(pageKey,it,fp);container.appendChild(it)}}}
 
@@ -538,29 +539,6 @@ const NOTICE_CATEGORIES=[
   {id:'ext_hq',name:'外單位通告－處本部',bg:'#e2d9f3',text:'#3c2a6e'},
   {id:'ext_maint',name:'外單位通告－維修處',bg:'#e2d9f3',text:'#3c2a6e'}
 ];
-const DUTY_UNITS=['站務中心','北段辦','南段辦','關啟彥'];
-const NOTICE_DEPTS=['站務中心SOC','行控中心OCC','票務中心TKC','運務處OPD','車輛廠RSP','軌道土木廠TCP','電子廠ELP','電機廠EMP','維修處MAD'];
-function unitSelectHtml(id,list,current){
-  const cur=current||'';
-  const isOther=cur&&!list.includes(cur);
-  return `<select id="${id}" onchange="toggleOtherUnit('${id}')">
-    <option value="">請選擇發布單位</option>
-    ${list.map(u=>`<option value="${escapeHtml(u)}" ${u===cur?'selected':''}>${escapeHtml(u)}</option>`).join('')}
-    <option value="__other__" ${isOther?'selected':''}>其他（手動輸入）</option>
-  </select>
-  <input type="text" id="${id}-other" placeholder="請輸入單位名稱" style="margin-top:6px;${isOther?'':'display:none'}" value="${isOther?escapeHtml(cur):''}">`;
-}
-function toggleOtherUnit(id){
-  const sel=document.getElementById(id),other=document.getElementById(id+'-other');
-  if(!sel||!other)return;
-  other.style.display=sel.value==='__other__'?'':'none';
-}
-function getUnitValue(id){
-  const sel=document.getElementById(id);
-  if(!sel)return '';
-  if(sel.value==='__other__')return document.getElementById(id+'-other')?.value?.trim()||'';
-  return sel.value;
-}
 function escapeHtml(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function isValidDate(s){return !!(s && /^\d{4}-\d{2}-\d{2}$/.test(s));}
 function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
@@ -940,7 +918,7 @@ function renderFormList(){
 function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上傳</div><div class="psub">新增勤前指示或從 Google Sheets 批次匯入</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'td-m')">手動新增</div><div class="tab" onclick="switchTab(this,'td-s')">從 Google Sheets 匯入</div></div>
 <div class="tabpane active" id="td-m"><div class="card">
-  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">事項標題 *</label><input type="text" id="dt" placeholder="請輸入勤前指示標題"></div><div><label class="fl2">發布單位</label>${unitSelectHtml('du',DUTY_UNITS,'')}</div></div>
+  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">事項標題 *</label><input type="text" id="dt" placeholder="請輸入勤前指示標題"></div><div></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">分類 *</label><select id="dcat"><option value="">請選擇分類</option>${DUTY_CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div><label class="fl2">宣達者 *</label><input type="text" id="dann" placeholder="請輸入宣達者姓名"></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">發布日期 *</label><input type="date" id="df"></div><div><label class="fl2">到期日期</label><input type="date" id="de"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">內容說明</label><textarea id="dc" placeholder="請輸入勤前指示內容…"></textarea></div>
@@ -963,7 +941,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
 function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告上傳</div><div class="psub">發布通告，將列入效期內通告頁面</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'nb-m')">手動新增</div><div class="tab" onclick="switchTab(this,'nb-b')">批次上傳（資料夾）</div></div>
 <div class="tabpane active" id="nb-m"><div class="card">
-  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div><div><label class="fl2">發布單位</label>${unitSelectHtml('nu',NOTICE_DEPTS,'')}</div></div>
+  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div><div></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">分類 *</label><select id="ncat"><option value="">請選擇分類</option>${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">生效日期 *</label><input type="date" id="nf"></div><div><label class="fl2">到期日期 *</label><input type="date" id="ne"></div></div>
   <div class="fg2" style="margin-bottom:12px">
@@ -1377,7 +1355,6 @@ async function saveDuty() {
     }
     const newRef = await addDoc(collection(window._db, 'duty_briefs'), {
       title, category, announcer,
-      unit: getUnitValue('du'),
       issuedDate: fromDate,
       expiryDate: document.getElementById('de')?.value || null,
       content: document.getElementById('dc')?.value || '',
@@ -1388,8 +1365,6 @@ async function saveDuty() {
     setBtnSuccess(btn, '已儲存');
     showToast('勤前指示已儲存');
     ['dt','dc','dann'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    const duEl=document.getElementById('du'); if(duEl){duEl.value='';toggleOtherUnit('du');}
-    const duOther=document.getElementById('du-other'); if(duOther)duOther.value='';
     ['df','de'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const dcatEl = document.getElementById('dcat'); if (dcatEl) dcatEl.value = '';
     const fl = document.getElementById('dfl'); if (fl) fl.innerHTML = '';
@@ -1421,7 +1396,6 @@ async function saveNotice() {
     }
     const newRef = await addDoc(collection(window._db, 'notices'), {
       title, category,
-      unit: getUnitValue('nu'),
       issuedDate: fromDate,
       expiryDate: toDate,
       extended: document.getElementById('nx')?.value === '1',
@@ -1435,8 +1409,6 @@ async function saveNotice() {
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
     ['nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
-    const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const ncatEl = document.getElementById('ncat'); if (ncatEl) ncatEl.value = '';
     const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
@@ -1466,11 +1438,11 @@ async function supersedeDoc(collectionName, docId, newDocId){
 
 // ===== 軟刪除：標記status為deleted，不真正刪除資料，S級專用 =====
 // ===== 操作紀錄：統一記錄新增/編輯/刪除/下架動作 =====
-async function logActivity(kind, action, docId, title, extra){
+async function logActivity(kind, action, docId, title, extra, dept){
   try{
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await addDoc(collection(window._db, 'activity_log'), {
-      kind, action, docId: docId||'', title: title||'',
+      kind, action, docId: docId||'', title: title||'', dept: dept||'',
       byUid: window._uid||'', byName: window._displayName||'',
       extra: extra||'', at: serverTimestamp()
     });
@@ -1498,10 +1470,6 @@ function openEdit(kind, docId){
         <div><label class="fl2">宣達者 *</label><input type="text" id="ed-announcer" value="${escapeHtml(d.announcer||'')}"></div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
-        <div><label class="fl2">發布單位</label>${unitSelectHtml('ed-unit',DUTY_UNITS,d.unit||'')}</div>
-        <div></div>
-      </div>
-      <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">發布日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
         <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
       </div>
@@ -1512,7 +1480,7 @@ function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">分類 *</label><select id="ed-category">${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===d.category?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div><label class="fl2">發布單位</label>${unitSelectHtml('ed-unit',NOTICE_DEPTS,d.unit||'')}</div>
+        <div></div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">生效日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
@@ -1561,7 +1529,6 @@ async function saveEdit(){
       collectionName='duty_briefs';
       payload.category=document.getElementById('ed-category')?.value||'';
       payload.announcer=document.getElementById('ed-announcer')?.value?.trim()||'';
-      payload.unit=getUnitValue('ed-unit');
       payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
       payload.content=document.getElementById('ed-content')?.value||'';
@@ -1569,7 +1536,6 @@ async function saveEdit(){
     } else if(kind==='notice'){
       collectionName='notices';
       payload.category=document.getElementById('ed-category')?.value||'';
-      payload.unit=getUnitValue('ed-unit');
       payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
       payload.extended=document.getElementById('ed-extended')?.value==='1';
@@ -1589,7 +1555,8 @@ async function saveEdit(){
       localArr=window._formListDocs; renderFn=renderFormList;
     }
     await updateDoc(doc(window._db,collectionName,docId),payload);
-    await logActivity(kind,'update',docId,title);
+    const deptForLog=(localArr||[]).find(x=>x.id===docId)?.dept||'';
+    await logActivity(kind,'update',docId,title,'',deptForLog);
     if(localArr){
       const idx=localArr.findIndex(x=>x.id===docId);
       if(idx>=0) Object.assign(localArr[idx],payload,{updatedAt:{toDate:()=>new Date()}});
@@ -1760,7 +1727,7 @@ async function saveReg() {
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
     if (existing) await supersedeDoc('regulations', existing.id, docRef.id);
-    await logActivity('regulation', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'');
+    await logActivity('regulation', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'', document.getElementById('rdept')?.value||'');
     setBtnSuccess(btn, '上傳成功');
     showToast(existing ? '規章已上傳，並自動下架舊版本' : '規章已上傳');
     ['rd','rt','rv','rp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1802,7 +1769,7 @@ async function saveForm() {
       createdAt: serverTimestamp(), uploadedBy: window._uid
     });
     if (existing) await supersedeDoc('forms', existing.id, docRef.id);
-    await logActivity('form', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'');
+    await logActivity('form', existing?'update':'create', docRef.id, title, existing?'新版取代舊版':'', document.getElementById('fdept')?.value||'');
     setBtnSuccess(btn, '上傳成功');
     showToast(existing ? '表單已上傳，並自動下架舊版本' : '表單已上傳');
     ['fd','ft','fver'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -2254,7 +2221,7 @@ function renderActivityLog(){
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的紀錄</div>';return;}
   const actColor={create:'#3B6D11',update:'#0c447c',delete:'#E24B4A',batch_create:'#8a5a12',supersede:'#856404'};
   area.innerHTML=`<div class="card" style="padding:0;overflow:hidden"><table class="vtbl">
-    <thead><tr><th>時間</th><th>類型</th><th>動作</th><th>項目</th><th>操作人</th><th>備註</th></tr></thead>
+    <thead><tr><th>時間</th><th>類型</th><th>動作</th><th>項目</th><th>所屬處室／單位</th><th>操作人</th><th>備註</th></tr></thead>
     <tbody>${list.map(d=>{
       const t=d.at&&typeof d.at.toDate==='function'?d.at.toDate():null;
       const ts=t?`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`:'—';
@@ -2263,6 +2230,7 @@ function renderActivityLog(){
         <td>${LOG_KIND_LABEL[d.kind]||d.kind||'—'}</td>
         <td><span style="color:${actColor[d.action]||'#6b6b67'};font-weight:500">${LOG_ACTION_LABEL[d.action]||d.action||'—'}</span></td>
         <td>${escapeHtml(d.title||'—')}</td>
+        <td style="font-size:11px;color:var(--ts)">${escapeHtml(d.dept||'—')}</td>
         <td>${escapeHtml(d.byName||'—')}</td>
         <td style="color:var(--ts);font-size:11px">${escapeHtml(d.extra||'')}</td>
       </tr>`;
