@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 20</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 21</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1841,22 +1841,25 @@ async function openEdit(kind, docId){
   } else if(kind==='regulation'){
     titleEl.textContent='編輯規章資訊';
     html=`
+      <div style="margin-bottom:12px"><label class="fl2">文件編號 *</label><input type="text" id="ed-docNo" value="${escapeHtml(d.docNo||'')}"></div>
       <div style="margin-bottom:12px"><label class="fl2">文件名稱 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">文件位階</label><select id="ed-tier"><option value="1" ${d.tier===1?'selected':''}>第一階</option><option value="2" ${d.tier===2?'selected':''}>第二階</option><option value="3" ${d.tier===3?'selected':''}>第三階</option><option value="4" ${d.tier===4?'selected':''}>第四階</option></select></div>
         <div><label class="fl2">版次</label><input type="text" id="ed-version" value="${escapeHtml(d.version||'')}"></div>
       </div>
       <div style="margin-bottom:12px"><label class="fl2">所屬處室</label>${deptSelectHtml('ed-dept',d.dept||'')}</div>
+      <div style="margin-bottom:12px"><label class="fl2">上位文件編號（選填）</label><input type="text" id="ed-parentDoc" value="${escapeHtml(d.parentDoc||'')}" placeholder="請輸入上位文件編號"></div>
       <div style="margin-bottom:12px"><label class="fl2">核決日期</label><input type="date" id="ed-approvedDate" value="${d.approvedDate||''}"></div>
-      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次</div>`;
+      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次。修改文件編號會影響版本比對與歷史版本查詢，請謹慎確認</div>`;
   } else if(kind==='form'){
     titleEl.textContent='編輯表單資訊';
     html=`
+      <div style="margin-bottom:12px"><label class="fl2">表單編號 *</label><input type="text" id="ed-formNo" value="${escapeHtml(d.formNo||'')}"></div>
       <div style="margin-bottom:12px"><label class="fl2">表單名稱 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div style="margin-bottom:12px"><label class="fl2">版次</label><input type="text" id="ed-version" value="${escapeHtml(d.version||'')}"></div>
       <div style="margin-bottom:12px"><label class="fl2">所屬處室</label>${deptSelectHtml('ed-dept',d.dept||'')}</div>
       <div style="margin-bottom:12px"><label class="fl2">核決日期</label><input type="date" id="ed-approvedDate" value="${d.approvedDate||''}"></div>
-      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次</div>`;
+      <div class="info-box"><i class="ti ti-info-circle"></i>此處僅修改欄位資訊，不會更換原始檔案；如需更換檔案請重新上傳新版次。修改表單編號會影響版本比對與歷史版本查詢，請謹慎確認</div>`;
   }
   body.innerHTML=html;
   document.getElementById('modal-edit').classList.add('open');
@@ -1868,6 +1871,14 @@ async function saveEdit(){
   const {kind,docId}=ctx;
   const title=document.getElementById('ed-title')?.value?.trim();
   if(!title){ showToast('請輸入標題/名稱'); return; }
+  if(kind==='regulation'){
+    const docNo=document.getElementById('ed-docNo')?.value?.trim();
+    if(!docNo){ showToast('請輸入文件編號'); return; }
+  }
+  if(kind==='form'){
+    const formNo=document.getElementById('ed-formNo')?.value?.trim();
+    if(!formNo){ showToast('請輸入表單編號'); return; }
+  }
   const btn=document.querySelector('#modal-edit .btn-primary');
   setBtnLoading(btn,'儲存中…');
   try{
@@ -1894,13 +1905,16 @@ async function saveEdit(){
       localArr=window._noticeDocs; renderFn=renderNoticeList;
     } else if(kind==='regulation'){
       collectionName='regulations';
+      payload.docNo=document.getElementById('ed-docNo')?.value?.trim()||'';
       payload.tier=parseInt(document.getElementById('ed-tier')?.value)||2;
       payload.version=document.getElementById('ed-version')?.value?.trim()||'';
       payload.dept=document.getElementById('ed-dept')?.value||'';
+      payload.parentDoc=document.getElementById('ed-parentDoc')?.value?.trim()||'';
       payload.approvedDate=document.getElementById('ed-approvedDate')?.value||'';
       localArr=window._regListDocs; renderFn=renderRegList;
     } else if(kind==='form'){
       collectionName='forms';
+      payload.formNo=document.getElementById('ed-formNo')?.value?.trim()||'';
       payload.version=document.getElementById('ed-version')?.value?.trim()||'';
       payload.dept=document.getElementById('ed-dept')?.value||'';
       payload.approvedDate=document.getElementById('ed-approvedDate')?.value||'';
@@ -1917,6 +1931,7 @@ async function saveEdit(){
     showToast('已更新');
     closeModal('modal-edit');
     if(renderFn) renderFn();
+    if((kind==='regulation'||kind==='form') && document.getElementById('orphan-result')) loadOrphanCheck();
   }catch(e){
     setBtnError(btn);
     showToast('儲存失敗：'+e.message);
