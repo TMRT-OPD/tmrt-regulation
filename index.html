@@ -168,7 +168,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 17</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 18</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1927,7 +1927,7 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId,
   if (body) {
     const canAccessFile = (window._level==='S'||window._level==='A');
     const pdfLink = (fileUrl && canAccessFile) ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
-    const canReextract = canAccessFile && collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
+    const canReextract = canAccessFile && collectionName && docId && fileUrl && fileName && isReextractableFile(fileName);
     const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
     const hasKw = kw && String(kw).trim();
     const matchCount = (hasKw && fullText) ? countMatches(fullText, kw) : 0;
@@ -1937,7 +1937,7 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId,
       <button class="btn btn-sm" onclick="hlNav(1)"><i class="ti ti-chevron-down"></i> 下一筆</button>
     </div>` : '';
     if (!fullText || !fullText.trim()) {
-      body.innerHTML = `${pdfLink}${navBar}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${reextractBtn}`;
+      body.innerHTML = `${pdfLink}${navBar}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、舊版.doc格式暫不支援，或此文件是在「全文擷取」功能上線前上傳的舊資料）${canReextract?'，可點下方按鈕嘗試重新擷取':''}</div>${reextractBtn}`;
     } else {
       const rendered = hasKw ? highlightText(fullText, kw) : escapeHtml(fullText);
       body.innerHTML = `${pdfLink}${navBar}<div id="hl-scroll-area" style="white-space:pre-wrap;font-size:12.5px;line-height:1.8;color:var(--tp);max-height:60vh;overflow-y:auto;padding:4px;border:0.5px solid var(--bt);border-radius:var(--rm)">${rendered}</div>${reextractBtn}`;
@@ -1975,12 +1975,13 @@ async function reextractFullText(collectionName, docId, fileUrl, fileName){
     const res = await fetch(fileUrl);
     if (!res.ok) throw new Error('無法下載原始檔案，請確認檔案是否仍存在');
     const blob = await res.blob();
-    const {text} = await extractPdfText(blob, 500, (i,n,total) => {
+    const fileForExtract = new File([blob], fileName || 'file', {type: blob.type});
+    const {text} = await extractFileText(fileForExtract, 500, (i,n,total) => {
       if (body) body.innerHTML = `<div class="pholder">正在擷取中…(第 ${i}/${n} 頁${total>n?`，共${total}頁`:''})</div>`;
     });
     const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await updateDoc(doc(window._db, collectionName, docId), {fullText: text, fullTextUpdatedAt: serverTimestamp()});
-    showToast(text.trim() ? '已補上全文索引' : '重新擷取完成，但此文件可能是掃描件，仍無文字內容');
+    showToast(text.trim() ? '已補上全文索引' : '重新擷取完成，但此文件可能是掃描件或空白內容，仍無文字內容');
     const titleEl = document.getElementById('viewtext-modal-title');
     showFullText(titleEl?titleEl.textContent:'', text, fileUrl, fileName, collectionName, docId);
   } catch(e) {
@@ -2076,10 +2077,10 @@ async function saveForm() {
   }
 }
 
-// ===== 單筆上傳：選取PDF後自動擷取全文並帶入欄位 =====
+// ===== 單筆上傳：選取檔案後自動擷取全文並帶入欄位（支援PDF/Word/Excel） =====
 async function autoFillRegFromPdf(input){
   const file = input.files && input.files[0];
-  if (!file || !file.name.toLowerCase().endsWith('.pdf')) return;
+  if (!file || !isExtractableFile(file.name)) return;
   const st = document.getElementById('reg-extract-status');
   const fnMeta = extractMetaFromFilename(file.name);
   if (fnMeta && fnMeta.docNo) {
@@ -2088,10 +2089,10 @@ async function autoFillRegFromPdf(input){
     const rv = document.getElementById('rv'); if (rv && !rv.value && fnMeta.version) rv.value = fnMeta.version;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && fnMeta.dept) rdept.value = fnMeta.dept;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文並辨識欄位…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
   try {
-    const {text, truncated} = await extractPdfText(file, 500, (i,n,total)=>{
-      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
+    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._regExtractedText = text;
     const meta = extractDocMetaFromText(text, file.name);
@@ -2118,16 +2119,16 @@ async function autoFillFormFromPdf(input){
     const fver = document.getElementById('fver'); if (fver && !fver.value && fnMeta.version) fver.value = fnMeta.version;
     const fdept = document.getElementById('fdept'); if (fdept && !fdept.value && fnMeta.dept) fdept.value = fnMeta.dept;
   }
-  if (!file.name.toLowerCase().endsWith('.pdf')) {
+  if (!isExtractableFile(file.name)) {
     if (st) st.innerHTML = fnMeta && fnMeta.docNo
-      ? '<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（Word/Excel無法擷取全文索引）'
-      : '<span style="color:#856404">檔名未包含可辨識的文件編號格式，請手動輸入（Word/Excel無法擷取全文）</span>';
+      ? '<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（此檔案格式無法擷取全文索引）'
+      : '<span style="color:#856404">檔名未包含可辨識的文件編號格式，請手動輸入（此檔案格式無法擷取全文）</span>';
     return;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文並辨識欄位…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
   try {
-    const {text, truncated} = await extractPdfText(file, 500, (i,n,total)=>{
-      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取PDF全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
+    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._formExtractedText = text;
     const meta = extractDocMetaFromText(text, file.name);
@@ -2262,11 +2263,10 @@ async function handleFormBatchFiles(input){
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const isPdf = file.name.toLowerCase().endsWith('.pdf');
     const fnMeta = extractMetaFromFilename(file.name);
-    if (isPdf) {
+    if (isExtractableFile(file.name)) {
       try {
-        const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
+        const {text} = await extractFileText(file, 500, (pi,pn,ptotal)=>{
           area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
         });
         const meta = extractDocMetaFromText(text, file.name);
@@ -2303,7 +2303,7 @@ function renderFormBatchPreview(){
   if (!area) return;
   if (rows.length === 0) { area.innerHTML = ''; return; }
   const rowsHtml = rows.map((r,i)=>`<tr>
-    <td>${escapeHtml(r.file.name)}${r._notPdf?`<div style="color:#856404;font-size:11px">非PDF，僅靠檔名辨識</div>`:''}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗</div>`:''}</td>
+    <td>${escapeHtml(r.file.name)}${r._notPdf?`<div style="color:#856404;font-size:11px">舊版.doc格式暫不支援全文擷取，僅靠檔名辨識</div>`:''}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗：${escapeHtml(r._extractError)}</div>`:''}</td>
     <td><input type="text" id="formb-no-${i}" value="${escapeHtml(r.formNo)}" style="min-width:150px" oninput="window._formBatchRows[${i}].formNo=this.value"></td>
     <td><input type="text" id="formb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:160px" oninput="window._formBatchRows[${i}].title=this.value"></td>
     <td><select id="formb-dept-${i}" style="min-width:150px" onchange="window._formBatchRows[${i}].dept=this.value">${deptOptionsHtml(r.dept)}</select></td>
@@ -2646,7 +2646,73 @@ function parseMinguoDate(s){
   return `${y}-${mo}-${d}`;
 }
 
-// ===== PDF.js 全文擷取 =====
+// ===== Word/Excel 全文擷取 =====
+let _mammothLoadingPromise=null;
+function ensureMammoth(){
+  if(window.mammoth) return Promise.resolve(window.mammoth);
+  if(_mammothLoadingPromise) return _mammothLoadingPromise;
+  _mammothLoadingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+    s.onload=()=>resolve(window.mammoth);
+    s.onerror=()=>reject(new Error('Word 解析套件載入失敗，請檢查網路連線'));
+    document.head.appendChild(s);
+  });
+  return _mammothLoadingPromise;
+}
+async function extractWordText(file){
+  const mammoth = await ensureMammoth();
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({arrayBuffer: buf});
+  const text = (result.value||'').split('\n').map(l=>l.trim()).filter(l=>l).join('\n');
+  return {text, numPages: 1, extractedPages: 1, truncated: false};
+}
+
+let _xlsxLoadingPromise=null;
+function ensureXlsx(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(_xlsxLoadingPromise) return _xlsxLoadingPromise;
+  _xlsxLoadingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=()=>resolve(window.XLSX);
+    s.onerror=()=>reject(new Error('Excel 解析套件載入失敗，請檢查網路連線'));
+    document.head.appendChild(s);
+  });
+  return _xlsxLoadingPromise;
+}
+async function extractExcelText(file){
+  const XLSX = await ensureXlsx();
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  let text = '';
+  wb.SheetNames.forEach(name => {
+    const sheet = wb.Sheets[name];
+    const csv = XLSX.utils.sheet_to_csv(sheet, {blankrows:false}).trim();
+    if(csv){ text += `【工作表：${name}】\n${csv}\n\n`; }
+  });
+  return {text: text.trim(), numPages: wb.SheetNames.length, extractedPages: wb.SheetNames.length, truncated: false};
+}
+
+function isExtractableFile(filename){
+  const n=(filename||'').toLowerCase();
+  return n.endsWith('.pdf')||n.endsWith('.docx')||n.endsWith('.doc')||n.endsWith('.xlsx')||n.endsWith('.xls');
+}
+function isReextractableFile(filename){
+  // 舊版.doc（非.docx）目前解析套件無法處理，僅.docx／PDF／Excel支援重新擷取
+  const n=(filename||'').toLowerCase();
+  return n.endsWith('.pdf')||n.endsWith('.docx')||n.endsWith('.xlsx')||n.endsWith('.xls');
+}
+async function extractFileText(file, maxPages, onProgress){
+  const name=(file.name||'').toLowerCase();
+  if(name.endsWith('.pdf')) return extractPdfText(file, maxPages, onProgress);
+  if(name.endsWith('.docx')) return extractWordText(file);
+  if(name.endsWith('.doc')) throw new Error('舊版.doc格式暫不支援全文擷取，請另存為.docx後重新上傳，或忽略此訊息（不影響上傳本身）');
+  if(name.endsWith('.xlsx')||name.endsWith('.xls')) return extractExcelText(file);
+  return {text:'', numPages:0, extractedPages:0, truncated:false};
+}
+
+
 let _pdfJsLoadingPromise=null;
 function ensurePdfJs(){
   if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
