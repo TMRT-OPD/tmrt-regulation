@@ -166,7 +166,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 10</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 11</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -874,7 +874,7 @@ function renderRegList(){
     <td>版次 ${d.version||'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
-      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
+      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.docNo ? `<button class="btn btn-sm" onclick="showVersionHistory('regulations','docNo','${d.docNo}','${escapeHtml(d.title||d.docNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
       ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("regulation",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
@@ -934,7 +934,7 @@ function renderFormList(){
     <td>${d.version?('版次 '+escapeHtml(d.version)):'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
-      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
+      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.formNo ? `<button class="btn btn-sm" onclick="showVersionHistory('forms','formNo','${d.formNo}','${escapeHtml(d.title||d.formNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
       ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("form",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
