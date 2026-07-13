@@ -147,9 +147,9 @@ textarea{resize:vertical;min-height:80px}
     <div class="ni" onclick="gp('duty',this)"><i class="ti ti-bell"></i>勤前指示</div>
     <div class="ni" onclick="gp('notice',this)"><i class="ti ti-speakerphone"></i>通告</div>
     <div class="nsec">規章</div>
-    <div class="ni" onclick="toggleSub('sub-reg',this)"><i class="ti ti-folders"></i>規章<i class="ti ti-chevron-right na"></i></div>
+    <div class="ni" style="display:flex;align-items:center;gap:0"><span style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer" onclick="gp('reg-unit',this.closest('.ni'),'')"><i class="ti ti-folders"></i>規章</span><i class="ti ti-chevron-right na" style="cursor:pointer;padding:4px 6px" onclick="toggleSub('sub-reg',this.closest('.ni'))"></i></div>
     <div class="nc" id="sub-reg"></div>
-    <div class="ni" onclick="toggleSub('sub-form',this)"><i class="ti ti-file-text"></i>表單<i class="ti ti-chevron-right na"></i></div>
+    <div class="ni" style="display:flex;align-items:center;gap:0"><span style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer" onclick="gp('form-unit',this.closest('.ni'),'')"><i class="ti ti-file-text"></i>表單</span><i class="ti ti-chevron-right na" style="cursor:pointer;padding:4px 6px" onclick="toggleSub('sub-form',this.closest('.ni'))"></i></div>
     <div class="nc" id="sub-form"></div>
     <div class="nsec">密碼</div>
     <div class="ni" onclick="openChangePwd()"><i class="ti ti-key"></i>修改密碼</div>
@@ -166,7 +166,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 11</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 12</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -252,7 +252,7 @@ var _level='B'; window._level='B'; var _uid='';
 const regTree={
   "人力資源處(HRD)":null,"工安處(ISD)":null,"企劃處(PLD)":null,"行政處(ADD)":null,"財會處(FAD)":null,"副總經理室(VPO)":null,"資訊處(IMD)":null,
   "運務處(OPD)":{"行控中心OCC":null,"站務中心SOC":null,"票務中心TKC":null,"運務處OPD":null},
-  "維修處(MAD)":{"車輛廠RSP":{"DEQ機廠設備":null,"EMU電聯車":null,"GEN共通":null},"軌道土木廠TCP":{"CVC土建":null,"CVH工程車":null,"DEQ機廠設備":null,"GEN共通":null,"TKM軌道":null},"電子廠ELP":{"COM通訊系統":null,"GEN共通性":null,"OCS號誌系統":null},"電機廠EMP":{"FFS消防系統":{"AFE自動氣體滅火系統":null,"FA消防警報系統":null,"FW消防水系統":null,"OT其他":null},"GEN共通":{"MN管理":null},"PWR電力系統":{"BSS主變電站":null,"FPSS設備變電站":null,"OT其他":null,"PPSS牽引動力變電站":null,"PRC電力遙控系統":null,"WSE道旁設備":null},"SME車站設備":{"ACS空調系統":null,"ELV電梯":null,"ESC電扶梯":null}},"維修處MAD":{"DEQ機廠設備":null,"GEN共通":{"MN管理":null,"OT其他":null,"SF安全":null}}}
+  "維修處(MAD)":{"車輛廠RSP":{"DEQ機廠設備":null,"EMU電聯車":null,"GEN共通":null},"軌道土木廠TCP":{"CVC土建":null,"CVH工程車":null,"DEQ機廠設備":null,"GEN共通":null,"TKM軌道":null},"電子廠ELP":{"COM通訊系統":null,"GEN共通性":null,"OCS號誌系統":null},"電機廠EMP":{"FFS消防系統":{"AFE自動氣體滅火系統":null,"FA消防警報系統":null,"FW消防水系統":null,"OT其他":null},"GEN共通":{"MN管理":null},"PWR電力系統":{"BSS主變電站":null,"FPSS設備變電站":null,"OT其他":null,"PPSS牽引動力變電站":null,"PRC電力遙控系統":null,"WSE道旁設備":null},"SME車站設備":{"ACS空調系統":null,"ELV電梯":null,"ESC電扶梯":null},"WEC水環":null},"維修處MAD":{"DEQ機廠設備":null,"GEN共通":{"MN管理":null,"OT其他":null,"SF安全":null}}}
 };
 
 function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','reg-unit');}
@@ -264,7 +264,30 @@ function searchDeptOptions(){
   flattenTreeLeaves(regTree).forEach(u=>{ if(!leaves.includes(u)) leaves.push(u); });
   return [...leaves, ...SEARCH_EXTRA_UNITS];
 }
-function buildBranch(node,container,path,pageKey){pageKey=pageKey||'reg-unit';for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s';t.appendChild(document.createTextNode(key));t.appendChild(ic);const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';t.onclick=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};buildBranch(ch,s,fp,pageKey);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp(pageKey,it,fp);container.appendChild(it)}}}
+function resolveTreeNode(path){
+  if(!path)return regTree;
+  const parts=path.split(' / ');
+  let node=regTree;
+  for(const p of parts){
+    if(node && typeof node==='object' && Object.prototype.hasOwnProperty.call(node,p)){
+      node=node[p];
+    }else{
+      return undefined;
+    }
+  }
+  return node;
+}
+function deptsForPath(path){
+  if(!path)return flattenTreeLeaves(regTree);
+  const parts=path.split(' / ');
+  const lastKey=parts[parts.length-1];
+  const node=resolveTreeNode(path);
+  if(node && typeof node==='object'){
+    return flattenTreeLeaves(node);
+  }
+  return [lastKey];
+}
+function buildBranch(node,container,path,pageKey){pageKey=pageKey||'reg-unit';for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const label=document.createElement('span');label.textContent=key;label.style.cssText='flex:1;cursor:pointer';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s;cursor:pointer;padding:2px 6px';const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';const toggle=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};ic.onclick=(e)=>{e.stopPropagation();toggle();};label.onclick=()=>{gp(pageKey,t,fp);if(s.style.display!=='block')toggle();};t.appendChild(label);t.appendChild(ic);buildBranch(ch,s,fp,pageKey);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp(pageKey,it,fp);container.appendChild(it)}}}
 
 function toggleSub(id,el){const s=document.getElementById(id);if(!s)return;const o=s.style.display==='block';s.style.display=o?'none':'block';const a=el.querySelector('.na');if(a)a.style.transform=o?'':'rotate(90deg)'}
 
@@ -795,10 +818,11 @@ function renderNoticeList(){
 }
 function pageRegUnit(p){
   const unitName = p ? p.split(' / ').pop() : '';
-  const html = `<div class="ptitle">規章 — ${unitName}</div><div class="psub">${p||''}</div>
+  const depts = deptsForPath(p||'');
+  const html = `<div class="ptitle">規章 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${depts.length>1?`（含 ${depts.length} 個分類）`:''}</div>
   <div class="sb"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號、名稱或內文關鍵字" oninput="renderRegList()"></div>
   <div id="reg-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
-  setTimeout(() => loadRegList(unitName), 0);
+  setTimeout(() => loadRegList(depts), 0);
   return html;
 }
 
@@ -837,19 +861,28 @@ async function loadReadmeReg() {
   }
 }
 
-async function loadRegList(unitName) {
+async function loadRegList(depts) {
   const area = document.getElementById('reg-list-area');
   if (!area) return;
   try {
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const q = query(
-      collection(window._db, 'regulations'),
-      where('dept', '==', unitName),
-      where('status', '==', 'active')
-    );
-    const snap = await getDocs(q);
+    const deptSet = new Set(depts||[]);
+    let snap;
+    if (deptSet.size > 0 && deptSet.size <= 30) {
+      const q = query(
+        collection(window._db, 'regulations'),
+        where('dept', 'in', Array.from(deptSet)),
+        where('status', '==', 'active')
+      );
+      snap = await getDocs(q);
+    } else {
+      const q = query(collection(window._db, 'regulations'), where('status', '==', 'active'));
+      const fullSnap = await getDocs(q);
+      snap = { forEach: (cb) => fullSnap.forEach(doc => { if (deptSet.has(doc.data().dept)) cb(doc); }) };
+    }
     window._regListDocs = [];
     snap.forEach(doc => window._regListDocs.push({id: doc.id, ...doc.data()}));
+    window._regListMulti = deptSet.size > 1;
     renderRegList();
   } catch(e) {
     area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
@@ -861,15 +894,17 @@ function renderRegList(){
   if (!area || !window._regListDocs) return;
   const kw = (document.getElementById('reg-search')?.value||'').trim().toLowerCase();
   const list = window._regListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.docNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
-  if (window._regListDocs.length === 0) { area.innerHTML = '<div class="pholder">此單位尚無規章資料</div>'; return; }
+  if (window._regListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無規章資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的規章</div>'; return; }
   const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
+  const showDept = !!window._regListMulti;
   const rows = list.map(d => {
     const titleHit=kw&&(d.title||'').toLowerCase().includes(kw);
     const contentSnippet=(kw&&!titleHit&&d.fullText&&d.fullText.toLowerCase().includes(kw))?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
     return `<tr>
     <td><strong>${highlightText(d.docNo||'—',kw)}</strong></td>
     <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}${contentSnippet}</td>
+    ${showDept?`<td style="font-size:11px;color:var(--ts)">${escapeHtml(d.dept||'—')}</td>`:''}
     <td><span class="badge" style="background:#e6f1fb;color:#0c447c">${tierLabels[d.tier]||'—'}</span></td>
     <td>版次 ${d.version||'—'}</td>
     <td>${d.approvedDate||'—'}</td>
@@ -884,7 +919,7 @@ function renderRegList(){
   }).join('');
   area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
     <table class="vtbl">
-      <thead><tr><th>文件編號</th><th>文件名稱</th><th>位階</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
+      <thead><tr><th>文件編號</th><th>文件名稱</th>${showDept?'<th>所屬處室</th>':''}<th>位階</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
@@ -892,26 +927,36 @@ function renderRegList(){
 
 function pageFormUnit(p){
   const unitName = p ? p.split(' / ').pop() : '';
-  const html = `<div class="ptitle">表單 — ${unitName}</div><div class="psub">${p||''}</div>
+  const depts = deptsForPath(p||'');
+  const html = `<div class="ptitle">表單 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${depts.length>1?`（含 ${depts.length} 個分類）`:''}</div>
   <div class="sb"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號、名稱或內文關鍵字" oninput="renderFormList()"></div>
   <div id="form-list-area"><div class="empty"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…</div></div>`;
-  setTimeout(() => loadFormList(unitName), 0);
+  setTimeout(() => loadFormList(depts), 0);
   return html;
 }
 
-async function loadFormList(unitName) {
+async function loadFormList(depts) {
   const area = document.getElementById('form-list-area');
   if (!area) return;
   try {
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const q = query(
-      collection(window._db, 'forms'),
-      where('dept', '==', unitName),
-      where('status', '==', 'active')
-    );
-    const snap = await getDocs(q);
+    const deptSet = new Set(depts||[]);
+    let snap;
+    if (deptSet.size > 0 && deptSet.size <= 30) {
+      const q = query(
+        collection(window._db, 'forms'),
+        where('dept', 'in', Array.from(deptSet)),
+        where('status', '==', 'active')
+      );
+      snap = await getDocs(q);
+    } else {
+      const q = query(collection(window._db, 'forms'), where('status', '==', 'active'));
+      const fullSnap = await getDocs(q);
+      snap = { forEach: (cb) => fullSnap.forEach(doc => { if (deptSet.has(doc.data().dept)) cb(doc); }) };
+    }
     window._formListDocs = [];
     snap.forEach(doc => window._formListDocs.push({id: doc.id, ...doc.data()}));
+    window._formListMulti = deptSet.size > 1;
     renderFormList();
   } catch(e) {
     area.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
@@ -923,14 +968,16 @@ function renderFormList(){
   if (!area || !window._formListDocs) return;
   const kw = (document.getElementById('form-search')?.value||'').trim().toLowerCase();
   const list = window._formListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.formNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
-  if (window._formListDocs.length === 0) { area.innerHTML = '<div class="pholder">此單位尚無表單資料</div>'; return; }
+  if (window._formListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無表單資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的表單</div>'; return; }
+  const showDept = !!window._formListMulti;
   const rows = list.map(d => {
     const titleHit=kw&&(d.title||'').toLowerCase().includes(kw);
     const contentSnippet=(kw&&!titleHit&&d.fullText&&d.fullText.toLowerCase().includes(kw))?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
     return `<tr>
     <td><strong>${highlightText(d.formNo||'—',kw)}</strong></td>
     <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}${contentSnippet}</td>
+    ${showDept?`<td style="font-size:11px;color:var(--ts)">${escapeHtml(d.dept||'—')}</td>`:''}
     <td>${d.version?('版次 '+escapeHtml(d.version)):'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
@@ -944,7 +991,7 @@ function renderFormList(){
   }).join('');
   area.innerHTML = `<div class="card" style="padding:0;overflow:hidden">
     <table class="vtbl">
-      <thead><tr><th>表單編號</th><th>表單名稱</th><th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
+      <thead><tr><th>表單編號</th><th>表單名稱</th>${showDept?'<th>所屬處室</th>':''}<th>版次</th><th>核決日期</th><th>操作</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
