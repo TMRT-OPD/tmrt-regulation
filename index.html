@@ -108,6 +108,7 @@ textarea{resize:vertical;min-height:80px}
 .list-card{background:var(--cp);border:0.5px solid var(--bt);border-radius:var(--rl);padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--bs)}
 .list-card.expired{background:#f8f9fa;border-left-color:#adb5bd}
 .kw-hl{background:#fff3a0;color:#1a1a18;padding:0 1px;border-radius:2px;font-weight:600}
+.kw-hl-active{background:#ff9f43!important;color:#fff!important;outline:2px solid #e0710a}
 .upload-progress{height:4px;background:var(--cs);border-radius:2px;margin-top:10px;overflow:hidden;display:none}
 .upload-progress-bar{height:100%;background:#378ADD;border-radius:2px;width:0%;transition:width .3s}
 .btn-success-temp{background:#1D9E75!important;border-color:#1D9E75!important}
@@ -165,7 +166,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 9</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 10</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -433,6 +434,12 @@ function snippetOf(text,kw){
   const end=Math.min(text.length,idx+kw.length+50);
   return (start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':'');
 }
+function countMatches(text,kw){
+  if(!text||!kw)return 0;
+  const re=new RegExp(escapeRegex(kw),'gi');
+  const m=text.match(re);
+  return m?m.length:0;
+}
 
 async function runSearch(kw){
   const r=document.getElementById('sr');
@@ -494,31 +501,37 @@ async function runSearch(kw){
 function renderSearchItem(d,kind,kw){
   if(kind==='duty'){
     const cat=DUTY_CATEGORIES.find(c=>c.id===d.category);
+    const n=countMatches(d.content,kw);
     return `<div class="list-card">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}</div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}</div>`:''}
+      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
+      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.content||"")}, "", "", "duty_briefs", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
     </div>`;
   } else if(kind==='notice'){
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
+    const n=countMatches(d.content,kw);
     return `<div class="list-card">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}</div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}</div>`:''}
+      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
+      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.content||"")}, "", "", "notices", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
     </div>`;
   } else if(kind==='regulation'){
+    const n=countMatches(d.fullText,kw);
     return `<div class="list-card" style="border-left-color:var(--ti)">
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)} <span style="font-weight:400;color:var(--ts);font-size:11px">（${d.docNo||'—'}）</span></div>
-      ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:''}
-      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
+      ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
+      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
     </div>`;
   } else if(kind==='form'){
+    const n=countMatches(d.fullText,kw);
     return `<div class="list-card" style="border-left-color:var(--ti)">
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)} <span style="font-weight:400;color:var(--ts);font-size:11px">（${d.formNo||'—'}）</span></div>
-      ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:''}
-      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
+      ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
+      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
     </div>`;
   }
   return '';
@@ -1684,7 +1697,8 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
 }
 
 // ===== 查閱全文：顯示擷取出的文字內容，而非直接開啟原始PDF =====
-function showFullText(title, fullText, fileUrl, fileName, collectionName, docId){
+let _hlIndex=0;
+function showFullText(title, fullText, fileUrl, fileName, collectionName, docId, kw){
   const titleEl = document.getElementById('viewtext-modal-title');
   const body = document.getElementById('viewtext-modal-body');
   if (titleEl) titleEl.textContent = title || '內文';
@@ -1693,13 +1707,43 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId)
     const pdfLink = (fileUrl && canAccessFile) ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
     const canReextract = canAccessFile && collectionName && docId && fileUrl && fileName && fileName.toLowerCase().endsWith('.pdf');
     const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
+    const hasKw = kw && String(kw).trim();
+    const matchCount = (hasKw && fullText) ? countMatches(fullText, kw) : 0;
+    const navBar = (hasKw && matchCount>0) ? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:12px;color:var(--ts);background:#fff8e1;border:0.5px solid #f0e0a0;border-radius:var(--rs);padding:6px 10px">
+      <span>符合「${escapeHtml(kw)}」共 <b>${matchCount}</b> 處，目前第 <b id="hl-nav-idx">1</b> 處</span>
+      <button class="btn btn-sm" onclick="hlNav(-1)"><i class="ti ti-chevron-up"></i> 上一筆</button>
+      <button class="btn btn-sm" onclick="hlNav(1)"><i class="ti ti-chevron-down"></i> 下一筆</button>
+    </div>` : '';
     if (!fullText || !fullText.trim()) {
-      body.innerHTML = `${pdfLink}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${reextractBtn}`;
+      body.innerHTML = `${pdfLink}${navBar}<div class="pholder">此文件尚未擷取到文字內容（可能是掃描件沒有文字圖層、為 Word/Excel 檔案，或此文件是在「全文擷取」功能上線前上傳的舊資料）</div>${reextractBtn}`;
     } else {
-      body.innerHTML = `${pdfLink}<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.8;color:var(--tp);max-height:60vh;overflow-y:auto;padding:4px;border:0.5px solid var(--bt);border-radius:var(--rm)">${escapeHtml(fullText)}</div>${reextractBtn}`;
+      const rendered = hasKw ? highlightText(fullText, kw) : escapeHtml(fullText);
+      body.innerHTML = `${pdfLink}${navBar}<div id="hl-scroll-area" style="white-space:pre-wrap;font-size:12.5px;line-height:1.8;color:var(--tp);max-height:60vh;overflow-y:auto;padding:4px;border:0.5px solid var(--bt);border-radius:var(--rm)">${rendered}</div>${reextractBtn}`;
+      if (hasKw && matchCount>0) {
+        _hlIndex=0;
+        setTimeout(()=>hlJump(0), 50);
+      }
     }
   }
   document.getElementById('modal-viewtext').classList.add('open');
+}
+function hlNav(delta){
+  const marks=document.querySelectorAll('#hl-scroll-area .kw-hl');
+  if(!marks.length)return;
+  _hlIndex=(_hlIndex+delta+marks.length)%marks.length;
+  hlJump(_hlIndex);
+}
+function hlJump(i){
+  const marks=document.querySelectorAll('#hl-scroll-area .kw-hl');
+  if(!marks.length)return;
+  marks.forEach(m=>m.classList.remove('kw-hl-active'));
+  const target=marks[i];
+  if(target){
+    target.classList.add('kw-hl-active');
+    target.scrollIntoView({block:'center'});
+  }
+  const idxEl=document.getElementById('hl-nav-idx');
+  if(idxEl)idxEl.textContent=i+1;
 }
 
 async function reextractFullText(collectionName, docId, fileUrl, fileName){
