@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 19</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 20</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1372,26 +1372,38 @@ async function runBackfillExtract(){
   const progress = document.getElementById('backfill-progress');
   const btn = document.querySelector('#backfill-result .btn-primary');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, done = 0;
   const failItems = [];
+  const CONCURRENCY = 6; // 同時平行處理筆數，兼顧速度與瀏覽器/網路負擔
+  const updateProgress = () => {
+    if (progress) progress.innerHTML = `<div class="pholder">正在批次處理…(${done}/${list.length}　成功 ${ok}　失敗／空白 ${fail})</div>`;
+  };
+  updateProgress();
   try {
     const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    for (let i = 0; i < list.length; i++) {
-      const item = list[i];
-      if (progress) progress.innerHTML = `<div class="pholder">正在處理 ${i+1}/${list.length}：${escapeHtml(item.title||item.docNo||'—')}…</div>`;
-      try {
-        const res = await fetch(item.fileUrl);
-        if (!res.ok) throw new Error('無法下載原始檔案');
-        const blob = await res.blob();
-        const fileForExtract = new File([blob], item.fileName, {type: blob.type});
-        const {text} = await extractFileText(fileForExtract, 500);
-        await updateDoc(doc(window._db, item.collectionName, item.id), {fullText: text||'', fullTextUpdatedAt: serverTimestamp()});
-        if (text && text.trim()) ok++; else { fail++; failItems.push({...item, reason:'擷取結果為空（可能是掃描件或空白內容）'}); }
-      } catch(e) {
-        fail++;
-        failItems.push({...item, reason: e.message});
+    let nextIndex = 0;
+    async function worker(){
+      while (nextIndex < list.length) {
+        const i = nextIndex++;
+        const item = list[i];
+        try {
+          const res = await fetch(item.fileUrl);
+          if (!res.ok) throw new Error('無法下載原始檔案');
+          const blob = await res.blob();
+          const fileForExtract = new File([blob], item.fileName, {type: blob.type});
+          const {text} = await extractFileText(fileForExtract, 500);
+          await updateDoc(doc(window._db, item.collectionName, item.id), {fullText: text||'', fullTextUpdatedAt: serverTimestamp()});
+          if (text && text.trim()) ok++; else { fail++; failItems.push({...item, reason:'擷取結果為空（可能是掃描件或空白內容）'}); }
+        } catch(e) {
+          fail++;
+          failItems.push({...item, reason: e.message});
+        }
+        done++;
+        updateProgress();
       }
     }
+    const workers = Array.from({length: Math.min(CONCURRENCY, list.length)}, () => worker());
+    await Promise.all(workers);
   } catch(e) {
     if (progress) progress.innerHTML = `<div class="pholder">批次擷取中斷：${e.message}</div>`;
     return;
