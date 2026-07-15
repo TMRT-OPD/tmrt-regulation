@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 31</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 32</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1445,15 +1445,27 @@ async function loadOrphanCheck(){
       area.innerHTML = '<div class="info-box"><i class="ti ti-circle-check"></i>沒有發現孤兒文件，所有資料的所屬處室都對得到目前的資料夾結構</div>';
       return;
     }
-    area.innerHTML = `<div class="info-box" style="margin-bottom:10px"><i class="ti ti-alert-triangle"></i>共發現 ${orphans.length} 筆文件的「所屬處室」對不到目前任何資料夾，請逐筆重新指定分類</div>` + orphans.map(o => `<div class="list-card" style="border-left-color:#E24B4A">
+    area.innerHTML = `<div class="info-box" style="margin-bottom:10px"><i class="ti ti-alert-triangle"></i>共發現 ${orphans.length} 筆文件的「所屬處室」對不到目前任何資料夾，請逐筆重新指定分類，或若分類本身錯誤（例如規章誤存成表單）可直接刪除後重新上傳</div>` + orphans.map(o => `<div class="list-card" style="border-left-color:#E24B4A">
       <div style="font-size:13px;font-weight:600">${escapeHtml(o.label)}｜${escapeHtml(o.title||'—')} <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(o.docNo||'—')}）</span></div>
       <div style="font-size:12px;color:var(--ts);margin-top:6px">目前記錄的所屬處室：<span style="color:#E24B4A">${escapeHtml(o.dept||'（空白）')}</span>（找不到對應資料夾）</div>
-      <div style="margin-top:8px"><button class="btn btn-sm" onclick='openEdit(${JSON.stringify(o.kind)},${JSON.stringify(o.id)})'><i class="ti ti-edit"></i> 重新指定所屬處室</button></div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn btn-sm" onclick='openEdit(${JSON.stringify(o.kind)},${JSON.stringify(o.id)})'><i class="ti ti-edit"></i> 重新指定所屬處室</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteOrphanItem(${JSON.stringify(o.kind)},${JSON.stringify(o.id)},${JSON.stringify(o.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+      </div>
     </div>`).join('');
   } catch(e) {
     area.innerHTML = `<div class="pholder">檢查失敗：${e.message}</div>`;
   }
 }
+async function deleteOrphanItem(kind, docId, title){
+  if(!confirm(`確定要刪除「${title||'此筆資料'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回；若分類錯誤，刪除後請重新上傳到正確的規章／表單分類）`)) return;
+  try{
+    const collectionName = kind==='regulation' ? 'regulations' : 'forms';
+    await softDelete(collectionName, docId);
+    await logActivity(kind, 'delete', docId, title, '因分類錯誤（孤兒文件檢查）刪除');
+    showToast('已刪除');
+    loadOrphanCheck();
+  }catch(e){ showToast('刪除失敗：'+e.message); }
 
 function pageBackfillText(){return`<div class="ptitle">後臺控管 — 批次補全文索引</div><div class="psub">掃描所有規章/表單，找出尚未擷取到全文內容的舊資料，一次補齊（S/A 級限定）</div>
 <div id="backfill-result"><div class="pholder"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>掃描中…</div></div>`;}
