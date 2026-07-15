@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 23</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 24</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -3020,14 +3020,18 @@ async function importFromSheets(){
     const existMap=new Map();
     snap.forEach(doc=>{const d=doc.data();existMap.set((d.title||'')+'|'+(d.issuedDate||''),{id:doc.id,data:d});});
     const normWs=s=>(s||'').replace(/[\s\u3000]+/g,' ').trim();
-    const FIELDS_TO_COMPARE=[['category','分類'],['announcer','宣達者'],['expiryDate','到期日期'],['content','內容']];
+    const SCALAR_FIELDS=[['category','分類'],['announcer','宣達者'],['expiryDate','到期日期']];
     parsed.forEach(p=>{
       const key=p.title+'|'+p.issuedDate;
       const existing=existMap.get(key);
       if(!existing){p._status='new';return;}
-      const changed=FIELDS_TO_COMPARE.filter(([f])=>normWs(p[f])!==normWs(existing.data[f])).map(([,label])=>label);
+      const scalarChanged=SCALAR_FIELDS.filter(([f])=>normWs(p[f])!==normWs(existing.data[f])).map(([,label])=>label);
+      // 內容改用「上次同步基準」比對，避免合併後資料庫內容變長，下次卻誤判成又有新異動
+      const baseline=existing.data.lastSheetContent!==undefined?existing.data.lastSheetContent:existing.data.content;
+      const contentChanged=normWs(p.content)!==normWs(baseline);
+      const changed=[...scalarChanged, ...(contentChanged?['內容（將自動合併保留兩邊）']:[])];
       if(changed.length===0){p._status='dup';}
-      else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;}
+      else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;p._contentChanged=contentChanged;}
     });
     const newRows=parsed.filter(p=>p._status==='new');
     const updateRows=parsed.filter(p=>p._status==='update');
@@ -3036,19 +3040,31 @@ async function importFromSheets(){
     let rowIdx=0;
     const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span> <button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="showSheetsDiff(${i})">檢視差異</button>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
     area.innerHTML=`
-      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（預設將更新，可取消勾選略過）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）</div>
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆有異動（分類/宣達者/到期日期將依Sheets覆蓋；內容若不同將自動合併保留兩邊，不會互相蓋掉）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）</div>
       ${(newRows.length+updateRows.length)?`<div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="sheets-select-all" checked onchange="document.querySelectorAll('.sheets-row-chk').forEach(c=>c.checked=this.checked)"> 全選／全不選</label></div>
       <div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
         <table class="vtbl"><thead><tr><th style="width:36px"></th><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
         <tbody>${newRows.map(renderRow).join('')}${updateRows.map(renderRow).join('')}</tbody>
         </table></div>
-        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空；標記黃字（異動：⋯）表示此筆在資料庫中已存在但內容有變動，勾選確認後將直接更新既有資料，不會產生重複——如果不確定異動是否為預期中的修改，可先取消勾選跳過，之後再自行確認</div>
+        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空；內容差異會自動合併、標記清楚哪段來自Sheets、哪段是資料庫原有內容，不會互相覆蓋；系統會記住這次同步到Sheets的哪個版本，只要Sheets之後沒有再變動，同一筆不會重複出現在異動清單中</div>
         <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入已勾選項目</button>`
       :'<div class="pholder">沒有新資料或異動需要處理</div>'}
     `;
   }catch(e){
     area.innerHTML=`<div class="pholder">連線失敗：${e.message}</div>`;
   }
+}
+
+function mergeContent(oldContent, newSheetContent){
+  const normWs=s=>(s||'').replace(/[\s\u3000]+/g,' ').trim();
+  const oldN=normWs(oldContent), newN=normWs(newSheetContent);
+  if(!oldN) return newSheetContent||'';
+  if(!newN) return oldContent||'';
+  if(oldN===newN) return newSheetContent;
+  if(newN.includes(oldN)) return newSheetContent; // Sheets版本已完整涵蓋資料庫原內容，直接採用
+  if(oldN.includes(newN)) return oldContent; // 資料庫原內容已完整涵蓋Sheets版本，維持原狀
+  const today=new Date().toISOString().slice(0,10);
+  return `${newSheetContent}\n\n【以下為資料庫原有內容，於 ${today} Sheets匯入時自動合併保留，請確認是否仍需要，若已無關可自行刪除】\n${oldContent}`;
 }
 
 function showSheetsDiff(idx){
@@ -3058,25 +3074,30 @@ function showSheetsDiff(idx){
   const body=document.getElementById('viewtext-modal-body');
   if(titleEl) titleEl.textContent=`差異比對：${p.title}`;
   if(body){
-    const fieldMap={'分類':'category','宣達者':'announcer','到期日期':'expiryDate','內容':'content'};
-    const blocks=(p._changed||[]).map(label=>{
-      const key=fieldMap[label];
-      const oldRaw=p._oldData?(p._oldData[key]||''):'';
-      const newRaw=p[key]||'';
-      return `<div style="margin-bottom:18px">
-        <div style="font-size:12px;font-weight:600;color:var(--tp);margin-bottom:6px">${escapeHtml(label)}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div>
-            <div style="font-size:11px;color:var(--ts);margin-bottom:4px">資料庫現有內容</div>
-            <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#fef2f2;border:0.5px solid #f3c6c6;border-radius:var(--rm);max-height:300px;overflow-y:auto">${oldRaw?escapeHtml(oldRaw):'<span style="color:var(--tt)">（空白）</span>'}</div>
+    const scalarMap={'分類':'category','宣達者':'announcer','到期日期':'expiryDate'};
+    let blocks='';
+    (p._changed||[]).forEach(label=>{
+      if(scalarMap[label]){
+        const key=scalarMap[label];
+        const oldRaw=p._oldData?(p._oldData[key]||''):'';
+        const newRaw=p[key]||'';
+        blocks+=`<div style="margin-bottom:18px">
+          <div style="font-size:12px;font-weight:600;color:var(--tp);margin-bottom:6px">${escapeHtml(label)}（將依 Sheets 覆蓋）</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><div style="font-size:11px;color:var(--ts);margin-bottom:4px">資料庫現有</div><div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#fef2f2;border:0.5px solid #f3c6c6;border-radius:var(--rm)">${oldRaw?escapeHtml(oldRaw):'<span style="color:var(--tt)">（空白）</span>'}</div></div>
+            <div><div style="font-size:11px;color:var(--ts);margin-bottom:4px">Sheets 最新（將採用）</div><div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#f0f9f0;border:0.5px solid #c6e3c6;border-radius:var(--rm)">${newRaw?escapeHtml(newRaw):'<span style="color:var(--tt)">（空白）</span>'}</div></div>
           </div>
-          <div>
-            <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Sheets 最新內容</div>
-            <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#f0f9f0;border:0.5px solid #c6e3c6;border-radius:var(--rm);max-height:300px;overflow-y:auto">${newRaw?escapeHtml(newRaw):'<span style="color:var(--tt)">（空白）</span>'}</div>
-          </div>
-        </div>
+        </div>`;
+      }
+    });
+    if(p._contentChanged){
+      const oldContent=p._oldData?(p._oldData.content||''):'';
+      const merged=mergeContent(oldContent, p.content||'');
+      blocks+=`<div style="margin-bottom:18px">
+        <div style="font-size:12px;font-weight:600;color:var(--tp);margin-bottom:6px">內容（自動合併預覽，確認匯入後會存成這樣）</div>
+        <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#f0f7ff;border:0.5px solid #b8d4f0;border-radius:var(--rm);max-height:360px;overflow-y:auto">${escapeHtml(merged)}</div>
       </div>`;
-    }).join('');
+    }
     body.innerHTML=blocks||'<div class="pholder">無異動內容可比對</div>';
   }
   document.getElementById('modal-viewtext').classList.add('open');
@@ -3101,9 +3122,12 @@ async function confirmSheetsImport(){
       for(const p of chunk){
         if(!p.category||!p.announcer||!p.issuedDate) incomplete++;
         if(p._status==='update'){
+          const oldContent=p._oldData?(p._oldData.content||''):'';
+          const mergedContent=p._contentChanged?mergeContent(oldContent,p.content||''):oldContent;
           batch.update(doc(window._db,'duty_briefs',p._docId),{
             category:p.category||'', announcer:p.announcer||'',
-            expiryDate:p.expiryDate||null, content:p.content||'',
+            expiryDate:p.expiryDate||null, content:mergedContent,
+            lastSheetContent:p.content||'',
             updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
           });
           updated++;
@@ -3113,6 +3137,7 @@ async function confirmSheetsImport(){
           batch.set(ref,{
             title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
             unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
+            lastSheetContent:p.content||'',
             attachments:[], status:'active',
             createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
           });
