@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 32</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 33</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1466,6 +1466,7 @@ async function deleteOrphanItem(kind, docId, title){
     showToast('已刪除');
     loadOrphanCheck();
   }catch(e){ showToast('刪除失敗：'+e.message); }
+}
 
 function pageBackfillText(){return`<div class="ptitle">後臺控管 — 批次補全文索引</div><div class="psub">掃描所有規章/表單，找出尚未擷取到全文內容的舊資料，一次補齊（S/A 級限定）</div>
 <div id="backfill-result"><div class="pholder"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>掃描中…</div></div>`;}
