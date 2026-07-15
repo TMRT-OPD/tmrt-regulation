@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 25</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 26</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2978,7 +2978,7 @@ async function importFromSheets(){
     : `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${sheetName?('&sheet='+encodeURIComponent(sheetName)):''}`;
   area.innerHTML='<div class="pholder">連線中…</div>';
   try{
-    const res=await fetch(csvUrl);
+    const res=await fetch(csvUrl+(csvUrl.includes('?')?'&':'?')+'_ts='+Date.now(), {cache:'no-store'});
     if(!res.ok) throw new Error('無法讀取試算表，請確認已設為「知道連結的人可以檢視」');
     const text=await res.text();
     const rows=parseCSV(text);
