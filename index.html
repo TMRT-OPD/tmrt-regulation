@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 26</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 27</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2991,6 +2991,7 @@ async function importFromSheets(){
     const iFrom=idx(['發布日期','生效日期']);
     const iTo=idx(['到期日期','失效日期']);
     const iAnn=idx(['宣達者','宣導者','宣導人']);
+    const iSeq=idx(['項次']);
     if(iContent<0){area.innerHTML='<div class="pholder">找不到「事項內容」欄位，請確認試算表標題列</div>';return;}
     const norm=s=>(s||'').replace(/\s+/g,'');
     const parsed=[];
@@ -3011,25 +3012,41 @@ async function importFromSheets(){
         categoryText: catText,
         issuedDate: parseMinguoDate(iFrom>=0?row[iFrom]:''),
         expiryDate: parseMinguoDate(iTo>=0?row[iTo]:''),
-        announcer: ((iAnn>=0?row[iAnn]:'')||'').trim()
+        announcer: ((iAnn>=0?row[iAnn]:'')||'').trim(),
+        seqNo: ((iSeq>=0?row[iSeq]:'')||'').trim()
       });
     }
     if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
     const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const snap=await getDocs(collection(window._db,'duty_briefs'));
+    // 比對鍵值＝標題+發布日期+項次，可正確分辨「同標題同日期但項次不同」的獨立資料列
+    // legacyMap 保留給尚未儲存過「項次」欄位的舊資料，讓第一筆對上的Sheets列可以完成一次性遷移，避免誤判成新增造成重複
     const existMap=new Map();
-    snap.forEach(doc=>{const d=doc.data();existMap.set((d.title||'')+'|'+(d.issuedDate||''),{id:doc.id,data:d});});
+    const legacyMap=new Map();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const baseKey=(d.title||'')+'|'+(d.issuedDate||'');
+      if(d.seqNo){ existMap.set(baseKey+'|'+d.seqNo,{id:doc.id,data:d}); }
+      else { legacyMap.set(baseKey,{id:doc.id,data:d}); }
+    });
     const normWs=s=>(s||'').replace(/[\s\u3000]+/g,' ').trim();
     const SCALAR_FIELDS=[['category','分類'],['announcer','宣達者'],['expiryDate','到期日期']];
     parsed.forEach(p=>{
-      const key=p.title+'|'+p.issuedDate;
-      const existing=existMap.get(key);
+      const baseKey=p.title+'|'+p.issuedDate;
+      const fullKey=baseKey+'|'+p.seqNo;
+      let existing=p.seqNo?existMap.get(fullKey):undefined;
+      if(!existing && legacyMap.has(baseKey)){
+        // 舊資料尚無項次紀錄，讓這次比對到的第一筆Sheets列完成遷移，之後同標題同日期的其他項次會正確視為新增
+        existing=legacyMap.get(baseKey);
+        legacyMap.delete(baseKey);
+        p._migratingSeqNo=true;
+      }
       if(!existing){p._status='new';return;}
       const scalarChanged=SCALAR_FIELDS.filter(([f])=>normWs(p[f])!==normWs(existing.data[f])).map(([,label])=>label);
       // 內容改用「上次同步基準」比對，避免合併後資料庫內容變長，下次卻誤判成又有新異動
       const baseline=existing.data.lastSheetContent!==undefined?existing.data.lastSheetContent:existing.data.content;
       const contentChanged=normWs(p.content)!==normWs(baseline);
-      const changed=[...scalarChanged, ...(contentChanged?['內容（將自動合併保留兩邊）']:[])];
+      const changed=[...scalarChanged, ...(contentChanged?['內容（將自動合併保留兩邊）']:[]), ...(p._migratingSeqNo?['已補上項次編號']:[])];
       if(changed.length===0){p._status='dup';}
       else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;p._contentChanged=contentChanged;}
     });
@@ -3138,7 +3155,7 @@ async function confirmSheetsImport(){
           batch.update(doc(window._db,'duty_briefs',p._docId),{
             category:p.category||'', announcer:p.announcer||'',
             expiryDate:p.expiryDate||null, content:mergedContent,
-            lastSheetContent:p.content||'',
+            lastSheetContent:p.content||'', seqNo:p.seqNo||'',
             updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
           });
           updated++;
@@ -3148,7 +3165,7 @@ async function confirmSheetsImport(){
           batch.set(ref,{
             title:p.title, content:p.content, category:p.category||'', announcer:p.announcer||'',
             unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
-            lastSheetContent:p.content||'',
+            lastSheetContent:p.content||'', seqNo:p.seqNo||'',
             attachments:[], status:'active',
             createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
           });
