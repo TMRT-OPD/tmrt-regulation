@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 29</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 30</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1822,14 +1822,20 @@ async function saveNotice() {
 }
 
 // ===== 版本管理：查找既有有效版本、將舊版下架（保留歷史，不刪除） =====
-async function findActiveDoc(collectionName, field, value){
+async function findActiveDoc(collectionName, field, value, title){
   if (!value) return null;
   const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
   const q = query(collection(window._db, collectionName), where(field,'==',value), where('status','==','active'));
   const snap = await getDocs(q);
   if (snap.empty) return null;
+  const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
   let result = null;
-  snap.forEach(d => { result = {id: d.id, data: d.data()}; });
+  snap.forEach(d => {
+    const data=d.data();
+    // 若有提供title，必須連名稱也一致才視為同一份文件的新版次；名稱不同則視為獨立文件，不觸發版本取代
+    if(title!==undefined && normTitle(data.title)!==normTitle(title)) return;
+    result = {id: d.id, data};
+  });
   return result;
 }
 async function supersedeDoc(collectionName, docId, newDocId){
@@ -2061,8 +2067,14 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const q = query(collection(window._db, collectionName), where(field, '==', value));
     const snap = await getDocs(q);
-    const list = [];
+    const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
+    let list = [];
     snap.forEach(d => list.push({id: d.id, ...d.data()}));
+    // 若同編號下有多份不同名稱的獨立文件（如同一編號被拆分成多份文件），僅保留與目前這份名稱一致的版本歷史，避免互相混雜
+    if (displayTitle) {
+      const filtered = list.filter(d => normTitle(d.title) === normTitle(displayTitle));
+      if (filtered.length > 0) list = filtered;
+    }
     if (list.length === 0) { body.innerHTML = '<div class="pholder">查無資料</div>'; return; }
     list.sort((a,b) => {
       const va = parseFloat(a.version) || 0, vb = parseFloat(b.version) || 0;
@@ -2171,7 +2183,7 @@ async function saveReg() {
     const ver = document.getElementById('rv')?.value || '1';
     const file = fileInput.files[0];
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const existing = await findActiveDoc('regulations', 'docNo', docNo);
+    const existing = await findActiveDoc('regulations', 'docNo', docNo, title);
     if (existing && String(existing.data.version||'') === String(ver)) {
       const proceed = confirm(`文件編號 ${docNo} 版次 ${ver} 目前已有一份有效版本，是否仍要上傳並取代？\n（原檔案不會被刪除，僅會下架不再顯示於瀏覽頁面）`);
       if (!proceed) { setBtnError(btn); return; }
@@ -2217,7 +2229,7 @@ async function saveForm() {
     const formNo = document.getElementById('fd')?.value?.trim() || '';
     const version = document.getElementById('fver')?.value?.trim() || '';
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const existing = formNo ? await findActiveDoc('forms', 'formNo', formNo) : null;
+    const existing = formNo ? await findActiveDoc('forms', 'formNo', formNo, title) : null;
     if (existing && version && String(existing.data.version||'') === String(version)) {
       const proceed = confirm(`表單編號 ${formNo} 版次 ${version} 目前已有一份有效版本，是否仍要上傳並取代？\n（原檔案不會被刪除，僅會下架不再顯示於瀏覽頁面）`);
       if (!proceed) { setBtnError(btn); return; }
@@ -2395,7 +2407,7 @@ async function confirmRegBatchUpload(){
       try {
         if (!r.title) throw new Error('缺文件名稱');
         const ver = r.version || '1';
-        const existing = await findActiveDoc('regulations', 'docNo', r.docNo);
+        const existing = await findActiveDoc('regulations', 'docNo', r.docNo, r.title);
         if (existing && String(existing.data.version||'') === String(ver)) { skippedDup++; }
         else {
           const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
@@ -2505,7 +2517,7 @@ async function confirmFormBatchUpload(){
       const r = rows[i];
       try {
         if (!r.title) throw new Error('缺表單名稱');
-        const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo) : null;
+        const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo, r.title) : null;
         if (existing && r.version && String(existing.data.version||'') === String(r.version)) { skippedDup++; }
         else {
           const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
