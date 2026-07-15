@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 28</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 29</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -439,7 +439,7 @@ function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">�
 `;}
 
 function pageSearch(){return`<div class="ptitle">綜合查詢</div><div class="psub">同時搜尋勤前指示／通告／規章／表單，依此順序分區塊呈現</div>
-<div class="sb"><i class="ti ti-search"></i><input id="search-kw" placeholder="輸入關鍵字，例如：請假、車門" oninput="doSearch(this.value)"></div>
+<div class="sb"><i class="ti ti-search"></i><input id="search-kw" placeholder="輸入關鍵字，可用空白分隔多個關鍵字，例如：請假 車門" oninput="doSearch(this.value)"></div>
 <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:10px 0 14px;font-size:12px;color:var(--tp)">
   <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="sf-duty" checked onchange="doSearch(document.getElementById('search-kw').value)">勤前指示</label>
   <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="sf-notice" checked onchange="doSearch(document.getElementById('search-kw').value)">通告</label>
@@ -464,19 +464,37 @@ function doSearch(q){
   _searchDebounce=setTimeout(()=>runSearch(q.trim()),300);
 }
 
+function splitKeywords(kw){
+  return (kw==null?'':String(kw)).trim().split(/\s+/).filter(Boolean);
+}
+function matchesAllKeywords(fields, kw){
+  const kws=splitKeywords(kw);
+  if(!kws.length) return true;
+  const blob=fields.filter(f=>f!=null&&f!=='').join(' \u0000 ').toLowerCase();
+  return kws.every(k=>blob.includes(k.toLowerCase()));
+}
 function snippetOf(text,kw){
   text=text||'';
-  const idx=text.toLowerCase().indexOf(kw.toLowerCase());
+  const kws=splitKeywords(kw);
+  if(!kws.length) return text.slice(0,80);
+  const tl=text.toLowerCase();
+  let idx=-1, hitLen=kws[0].length;
+  for(const k of kws){ const i=tl.indexOf(k.toLowerCase()); if(i>=0 && (idx<0||i<idx)){idx=i;hitLen=k.length;} }
   if(idx<0)return text.slice(0,80);
   const start=Math.max(0,idx-30);
-  const end=Math.min(text.length,idx+kw.length+50);
+  const end=Math.min(text.length,idx+hitLen+50);
   return (start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':'');
 }
 function countMatches(text,kw){
   if(!text||!kw)return 0;
-  const re=new RegExp(escapeRegex(kw),'gi');
-  const m=text.match(re);
-  return m?m.length:0;
+  const kws=splitKeywords(kw);
+  let total=0;
+  kws.forEach(k=>{
+    const re=new RegExp(escapeRegex(k),'gi');
+    const m=text.match(re);
+    total+=m?m.length:0;
+  });
+  return total;
 }
 
 async function runSearch(kw){
@@ -486,7 +504,7 @@ async function runSearch(kw){
   try{
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const kwLower=kw.toLowerCase();
-    const matchText=(fields)=>fields.some(f=>(f||'').toLowerCase().includes(kwLower));
+    const matchText=(fields)=>matchesAllKeywords(fields,kw);
     const wantDuty=document.getElementById('sf-duty')?.checked!==false;
     const wantNotice=document.getElementById('sf-notice')?.checked!==false;
     const wantReg=document.getElementById('sf-reg')?.checked!==false;
@@ -505,8 +523,8 @@ async function runSearch(kw){
     // 排序：標題比對到的排最前面，其餘依內文比對排後面；同組再依日期新到舊排序
     const sortByRelevance=(arr,dateField)=>{
       arr.sort((a,b)=>{
-        const aTitleHit=(a.title||'').toLowerCase().includes(kwLower)?0:1;
-        const bTitleHit=(b.title||'').toLowerCase().includes(kwLower)?0:1;
+        const aTitleHit=matchesAllKeywords([a.title],kw)?0:1;
+        const bTitleHit=matchesAllKeywords([b.title],kw)?0:1;
         if(aTitleHit!==bTitleHit)return aTitleHit-bTitleHit;
         const ad=a[dateField]||'', bd=b[dateField]||'';
         return bd.localeCompare(ad);
@@ -617,9 +635,14 @@ function isValidDate(s){return !!(s && /^\d{4}-\d{2}-\d{2}$/.test(s));}
 function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function highlightText(text,kw){
   const escaped=escapeHtml(text);
-  if(!kw)return escaped;
-  const re=new RegExp(escapeRegex(escapeHtml(kw)),'gi');
-  return escaped.replace(re,m=>`<mark class="kw-hl">${m}</mark>`);
+  const kws=splitKeywords(kw);
+  if(!kws.length)return escaped;
+  let result=escaped;
+  kws.forEach(k=>{
+    const re=new RegExp(escapeRegex(escapeHtml(k)),'gi');
+    result=result.replace(re,m=>`<mark class="kw-hl">${m}</mark>`);
+  });
+  return result;
 }
 function catBadge(cat){return cat?`<span class="cat-badge" style="background:${cat.bg};color:${cat.text}">${cat.name}</span>`:'<span class="cat-badge" style="background:#eee;color:#666">未分類</span>';}
 function expiredBadge(){return '<span class="cat-badge" style="background:#e9ecef;color:#495057">已逾期</span>';}
@@ -645,7 +668,7 @@ function pageDuty(){
     <div class="tab ${window._dutyState.tab==='missing'?'active':''}" data-tab="missing" onclick="switchListTab('duty','missing')" style="color:#856404">缺到期日</div>
     <div class="tab ${window._dutyState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('duty','all')">全部</div>
   </div>
-  <div class="sb"><i class="ti ti-search"></i><input id="duty-search" placeholder="搜尋勤前指示" oninput="renderDutyList()"></div>
+  <div class="sb"><i class="ti ti-search"></i><input id="duty-search" placeholder="搜尋勤前指示（可用空白分隔多個關鍵字）" oninput="renderDutyList()"></div>
   ${renderFilterUI('duty',DUTY_CATEGORIES)}
   <div id="duty-list-area"><div class="pholder">載入中…</div></div>`;
 }
@@ -661,7 +684,7 @@ function pageNotice(){
     <div class="tab ${window._noticeState.tab==='missing'?'active':''}" data-tab="missing" onclick="switchListTab('notice','missing')" style="color:#856404">缺到期日</div>
     <div class="tab ${window._noticeState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('notice','all')">全部</div>
   </div>
-  <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告" oninput="renderNoticeList()"></div>
+  <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告（可用空白分隔多個關鍵字）" oninput="renderNoticeList()"></div>
   ${renderFilterUI('notice',NOTICE_CATEGORIES)}
   <div id="notice-list-area"><div class="pholder">載入中…</div></div>`;
 }
@@ -742,7 +765,7 @@ function renderDutyList(){
     if(st.tab==='missing'&&!missingExpiry)return false;
     if(st.tab==='all'&&missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
-    if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
+    if(!matchesAllKeywords([d.title,d.content],kw))return false;
     return true;
   });
   if(st.tab==='expired'){
@@ -804,7 +827,7 @@ function renderNoticeList(){
     if(st.tab==='missing'&&!missingExpiry)return false;
     if(st.tab==='all'&&missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
-    if(kw&&!((d.title||'').toLowerCase().includes(kw)||(d.content||'').toLowerCase().includes(kw)))return false;
+    if(!matchesAllKeywords([d.title,d.content],kw))return false;
     return true;
   });
   if(st.tab==='expired'){
@@ -846,7 +869,7 @@ function pageRegUnit(p){
   const requireSearch = isMulti && pathDepth(p||'') <= 1;
   const html = `<div class="ptitle">規章 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${isMulti?`（含 ${depts.length} 個分類）`:''}</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:2px">
-    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號、名稱或內文關鍵字" oninput="renderRegList()"></div>
+    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號、名稱或內文關鍵字（可用空白分隔多個關鍵字）" oninput="renderRegList()"></div>
     <select id="reg-sort" onchange="renderRegList()" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
       <option value="docNo-asc">文件編號 A→Z</option>
       <option value="docNo-desc">文件編號 Z→A</option>
@@ -943,7 +966,7 @@ function renderRegList(){
   const kw = (document.getElementById('reg-search')?.value||'').trim().toLowerCase();
   const requireSearch = !!window._regListRequireSearch;
   if (requireSearch && !kw) { area.innerHTML = '<div class="pholder"><i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入文件編號、名稱或內文關鍵字開始搜尋</div>'; return; }
-  let list = window._regListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.docNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
+  let list = window._regListDocs.filter(d => matchesAllKeywords([d.title,d.docNo,d.fullText],kw));
   if (window._regListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無規章資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的規章</div>'; return; }
   const sortVal = document.getElementById('reg-sort')?.value || 'docNo-asc';
@@ -951,8 +974,8 @@ function renderRegList(){
   const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
   const showDept = !!window._regListMulti;
   const rows = list.map(d => {
-    const titleHit=kw&&(d.title||'').toLowerCase().includes(kw);
-    const contentSnippet=(kw&&!titleHit&&d.fullText&&d.fullText.toLowerCase().includes(kw))?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
+    const titleHit=matchesAllKeywords([d.title],kw);
+    const contentSnippet=(kw&&!titleHit&&d.fullText)?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
     return `<tr>
     <td><strong>${highlightText(d.docNo||'—',kw)}</strong></td>
     <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}${contentSnippet}</td>
@@ -984,7 +1007,7 @@ function pageFormUnit(p){
   const requireSearch = isMulti && pathDepth(p||'') <= 1;
   const html = `<div class="ptitle">表單 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${isMulti?`（含 ${depts.length} 個分類）`:''}</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:2px">
-    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號、名稱或內文關鍵字" oninput="renderFormList()"></div>
+    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號、名稱或內文關鍵字（可用空白分隔多個關鍵字）" oninput="renderFormList()"></div>
     <select id="form-sort" onchange="renderFormList()" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
       <option value="formNo-asc">表單編號 A→Z</option>
       <option value="formNo-desc">表單編號 Z→A</option>
@@ -1034,15 +1057,15 @@ function renderFormList(){
   const kw = (document.getElementById('form-search')?.value||'').trim().toLowerCase();
   const requireSearch = !!window._formListRequireSearch;
   if (requireSearch && !kw) { area.innerHTML = '<div class="pholder"><i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入表單編號、名稱或內文關鍵字開始搜尋</div>'; return; }
-  let list = window._formListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.formNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
+  let list = window._formListDocs.filter(d => matchesAllKeywords([d.title,d.formNo,d.fullText],kw));
   if (window._formListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無表單資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的表單</div>'; return; }
   const sortVal = document.getElementById('form-sort')?.value || 'formNo-asc';
   list = sortDocs(list, sortVal);
   const showDept = !!window._formListMulti;
   const rows = list.map(d => {
-    const titleHit=kw&&(d.title||'').toLowerCase().includes(kw);
-    const contentSnippet=(kw&&!titleHit&&d.fullText&&d.fullText.toLowerCase().includes(kw))?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
+    const titleHit=matchesAllKeywords([d.title],kw);
+    const contentSnippet=(kw&&!titleHit&&d.fullText)?`<div style="font-size:11px;color:var(--ts);margin-top:4px">${highlightText(snippetOf(d.fullText,kw),kw)}</div>`:'';
     return `<tr>
     <td><strong>${highlightText(d.formNo||'—',kw)}</strong></td>
     <td>${highlightText(d.title||'—',kw)}${lastUpdatedLine(d)}${contentSnippet}</td>
@@ -1177,7 +1200,7 @@ function pageUploadForm(){return`<div class="ptitle">後臺控管 — 表單上�
 </div></div>`;}
 
 function pageRevise(){return`<div class="ptitle">後臺控管 — 規章修訂比對</div><div class="psub">輸入關鍵字，系統自動比對所有規章全文，避免修訂時掛一漏萬</div>
-<div class="card"><div class="sb"><i class="ti ti-search"></i><input id="revise-kw" placeholder="輸入要修訂的關鍵字或條文內容" onkeydown="if(event.key==='Enter')doReviseSearch()"></div><div class="info-box"><i class="ti ti-info-circle"></i>系統將在所有「有效」規章的全文索引中比對，列出所有出現該關鍵字的規章與前後文</div><button class="btn btn-primary" onclick="doReviseSearch()"><i class="ti ti-search"></i> 開始比對</button></div>
+<div class="card"><div class="sb"><i class="ti ti-search"></i><input id="revise-kw" placeholder="輸入要修訂的關鍵字或條文內容（可用空白分隔多個關鍵字）" onkeydown="if(event.key==='Enter')doReviseSearch()"></div><div class="info-box"><i class="ti ti-info-circle"></i>系統將在所有「有效」規章的全文索引中比對，列出所有出現該關鍵字的規章與前後文</div><button class="btn btn-primary" onclick="doReviseSearch()"><i class="ti ti-search"></i> 開始比對</button></div>
 <div id="revise-result"><div class="pholder">輸入關鍵字後點擊比對，相關條文將列於此處</div></div>`;}
 
 function findNearestHeading(text, pos){
@@ -1198,27 +1221,32 @@ async function doReviseSearch(){
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const q = query(collection(window._db, 'regulations'), where('status','==','active'));
     const snap = await getDocs(q);
-    const kwLower = kw.toLowerCase();
+    const kws = splitKeywords(kw);
     const matches = [];
     snap.forEach(doc => {
       const d = doc.data();
       const text = d.fullText || '';
       const textLower = text.toLowerCase();
-      const titleHit = (d.title||'').toLowerCase().includes(kwLower);
+      if (!matchesAllKeywords([d.title, text], kw)) return;
+      const titleHit = matchesAllKeywords([d.title], kw);
       const snippets = [];
-      let searchFrom = 0;
-      while (snippets.length < 5) {
-        const found = textLower.indexOf(kwLower, searchFrom);
-        if (found < 0) break;
-        const heading = findNearestHeading(text, found);
-        const start = Math.max(0, found - 30);
-        const end = Math.min(text.length, found + kw.length + 30);
-        const body = (start>0?'…':'') + text.slice(start, end) + (end<text.length?'…':'');
-        snippets.push(heading ? `<span style="color:var(--ti);font-weight:600">［${escapeHtml(heading)}］</span>${body}` : body);
-        searchFrom = found + kw.length;
-      }
+      kws.forEach(k=>{
+        const kLower = k.toLowerCase();
+        let searchFrom = 0, countForThisKw = 0;
+        while (snippets.length < 5 && countForThisKw < 3) {
+          const found = textLower.indexOf(kLower, searchFrom);
+          if (found < 0) break;
+          const heading = findNearestHeading(text, found);
+          const start = Math.max(0, found - 30);
+          const end = Math.min(text.length, found + k.length + 30);
+          const body = (start>0?'…':'') + text.slice(start, end) + (end<text.length?'…':'');
+          snippets.push(heading ? `<span style="color:var(--ti);font-weight:600">［${escapeHtml(heading)}］</span>${body}` : body);
+          searchFrom = found + k.length;
+          countForThisKw++;
+        }
+      });
       if (titleHit || snippets.length > 0) {
-        matches.push({id:doc.id, docNo:d.docNo, title:d.title, dept:d.dept, version:d.version, fileUrl:d.fileUrl, fileName:d.fileName, fullText:text, hitCount:snippets.length, snippets});
+        matches.push({id:doc.id, docNo:d.docNo, title:d.title, dept:d.dept, version:d.version, fileUrl:d.fileUrl, fileName:d.fileName, fullText:text, hitCount:countMatches(text,kw), snippets});
       }
     });
     if (matches.length === 0) { area.innerHTML = `<div class="pholder">沒有找到包含「${escapeHtml(kw)}」的規章</div>`; return; }
