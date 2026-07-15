@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 22</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 23</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -3034,7 +3034,7 @@ async function importFromSheets(){
     const dupCount=parsed.filter(p=>p._status==='dup').length;
     window._sheetsImportRows=[...newRows,...updateRows];
     let rowIdx=0;
-    const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
+    const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span> <button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="showSheetsDiff(${i})">檢視差異</button>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
     area.innerHTML=`
       <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（預設將更新，可取消勾選略過）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）</div>
       ${(newRows.length+updateRows.length)?`<div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="sheets-select-all" checked onchange="document.querySelectorAll('.sheets-row-chk').forEach(c=>c.checked=this.checked)"> 全選／全不選</label></div>
@@ -3049,6 +3049,37 @@ async function importFromSheets(){
   }catch(e){
     area.innerHTML=`<div class="pholder">連線失敗：${e.message}</div>`;
   }
+}
+
+function showSheetsDiff(idx){
+  const p=(window._sheetsImportRows||[])[idx];
+  if(!p||p._status!=='update')return;
+  const titleEl=document.getElementById('viewtext-modal-title');
+  const body=document.getElementById('viewtext-modal-body');
+  if(titleEl) titleEl.textContent=`差異比對：${p.title}`;
+  if(body){
+    const fieldMap={'分類':'category','宣達者':'announcer','到期日期':'expiryDate','內容':'content'};
+    const blocks=(p._changed||[]).map(label=>{
+      const key=fieldMap[label];
+      const oldRaw=p._oldData?(p._oldData[key]||''):'';
+      const newRaw=p[key]||'';
+      return `<div style="margin-bottom:18px">
+        <div style="font-size:12px;font-weight:600;color:var(--tp);margin-bottom:6px">${escapeHtml(label)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:11px;color:var(--ts);margin-bottom:4px">資料庫現有內容</div>
+            <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#fef2f2;border:0.5px solid #f3c6c6;border-radius:var(--rm);max-height:300px;overflow-y:auto">${oldRaw?escapeHtml(oldRaw):'<span style="color:var(--tt)">（空白）</span>'}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--ts);margin-bottom:4px">Sheets 最新內容</div>
+            <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#f0f9f0;border:0.5px solid #c6e3c6;border-radius:var(--rm);max-height:300px;overflow-y:auto">${newRaw?escapeHtml(newRaw):'<span style="color:var(--tt)">（空白）</span>'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    body.innerHTML=blocks||'<div class="pholder">無異動內容可比對</div>';
+  }
+  document.getElementById('modal-viewtext').classList.add('open');
 }
 
 async function confirmSheetsImport(){
