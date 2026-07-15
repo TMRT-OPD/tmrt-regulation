@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 27</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 28</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -845,7 +845,17 @@ function pageRegUnit(p){
   const isMulti = depts.length > 1;
   const requireSearch = isMulti && pathDepth(p||'') <= 1;
   const html = `<div class="ptitle">規章 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${isMulti?`（含 ${depts.length} 個分類）`:''}</div>
-  <div class="sb"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號、名稱或內文關鍵字" oninput="renderRegList()"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:2px">
+    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="reg-search" placeholder="搜尋文件編號、名稱或內文關鍵字" oninput="renderRegList()"></div>
+    <select id="reg-sort" onchange="renderRegList()" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
+      <option value="docNo-asc">文件編號 A→Z</option>
+      <option value="docNo-desc">文件編號 Z→A</option>
+      <option value="title-asc">名稱 A→Z</option>
+      <option value="approvedDate-desc">核決日期 新→舊</option>
+      <option value="approvedDate-asc">核決日期 舊→新</option>
+      <option value="version-desc">版次 高→低</option>
+    </select>
+  </div>
   <div id="reg-list-area"><div class="pholder">${requireSearch?'<i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入文件編號、名稱或內文關鍵字開始搜尋':'<i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…'}</div></div>`;
   setTimeout(() => loadRegList(depts, requireSearch), 0);
   return html;
@@ -915,15 +925,29 @@ async function loadRegList(depts, requireSearch) {
   }
 }
 
+function sortDocs(list, sortVal, numFieldMap){
+  const [field, dir] = (sortVal||'docNo-asc').split('-');
+  const mul = dir==='desc' ? -1 : 1;
+  const isNum = numFieldMap && numFieldMap.includes(field);
+  return [...list].sort((a,b)=>{
+    let av=a[field], bv=b[field];
+    if(field==='version'){ av=parseFloat(av)||0; bv=parseFloat(bv)||0; return (av-bv)*mul; }
+    av=(av||''); bv=(bv||'');
+    return String(av).localeCompare(String(bv), 'zh-Hant', {numeric:true})*mul;
+  });
+}
+
 function renderRegList(){
   const area = document.getElementById('reg-list-area');
   if (!area || !window._regListDocs) return;
   const kw = (document.getElementById('reg-search')?.value||'').trim().toLowerCase();
   const requireSearch = !!window._regListRequireSearch;
   if (requireSearch && !kw) { area.innerHTML = '<div class="pholder"><i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入文件編號、名稱或內文關鍵字開始搜尋</div>'; return; }
-  const list = window._regListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.docNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
+  let list = window._regListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.docNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
   if (window._regListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無規章資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的規章</div>'; return; }
+  const sortVal = document.getElementById('reg-sort')?.value || 'docNo-asc';
+  list = sortDocs(list, sortVal);
   const tierLabels = {1:'第一階',2:'第二階',3:'第三階',4:'第四階'};
   const showDept = !!window._regListMulti;
   const rows = list.map(d => {
@@ -959,7 +983,17 @@ function pageFormUnit(p){
   const isMulti = depts.length > 1;
   const requireSearch = isMulti && pathDepth(p||'') <= 1;
   const html = `<div class="ptitle">表單 — ${unitName||'全部'}</div><div class="psub">${p||'所有處室'}${isMulti?`（含 ${depts.length} 個分類）`:''}</div>
-  <div class="sb"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號、名稱或內文關鍵字" oninput="renderFormList()"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:2px">
+    <div class="sb" style="flex:1;min-width:200px"><i class="ti ti-search"></i><input id="form-search" placeholder="搜尋表單編號、名稱或內文關鍵字" oninput="renderFormList()"></div>
+    <select id="form-sort" onchange="renderFormList()" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
+      <option value="formNo-asc">表單編號 A→Z</option>
+      <option value="formNo-desc">表單編號 Z→A</option>
+      <option value="title-asc">名稱 A→Z</option>
+      <option value="approvedDate-desc">核決日期 新→舊</option>
+      <option value="approvedDate-asc">核決日期 舊→新</option>
+      <option value="version-desc">版次 高→低</option>
+    </select>
+  </div>
   <div id="form-list-area"><div class="pholder">${requireSearch?'<i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入表單編號、名稱或內文關鍵字開始搜尋':'<i class="ti ti-loader-2" style="font-size:24px;display:block;margin:0 auto 8px;animation:spin 1s linear infinite"></i>載入中…'}</div></div>`;
   setTimeout(() => loadFormList(depts, requireSearch), 0);
   return html;
@@ -1000,9 +1034,11 @@ function renderFormList(){
   const kw = (document.getElementById('form-search')?.value||'').trim().toLowerCase();
   const requireSearch = !!window._formListRequireSearch;
   if (requireSearch && !kw) { area.innerHTML = '<div class="pholder"><i class="ti ti-search" style="font-size:28px;display:block;margin:0 auto 10px;color:var(--tt)"></i>此範圍含多個分類，請輸入表單編號、名稱或內文關鍵字開始搜尋</div>'; return; }
-  const list = window._formListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.formNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
+  let list = window._formListDocs.filter(d => !kw || (d.title||'').toLowerCase().includes(kw) || (d.formNo||'').toLowerCase().includes(kw) || (d.fullText||'').toLowerCase().includes(kw));
   if (window._formListDocs.length === 0) { area.innerHTML = '<div class="pholder">此範圍尚無表單資料</div>'; return; }
   if (list.length === 0) { area.innerHTML = '<div class="pholder">找不到符合的表單</div>'; return; }
+  const sortVal = document.getElementById('form-sort')?.value || 'formNo-asc';
+  list = sortDocs(list, sortVal);
   const showDept = !!window._formListMulti;
   const rows = list.map(d => {
     const titleHit=kw&&(d.title||'').toLowerCase().includes(kw);
