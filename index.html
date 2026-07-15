@@ -118,7 +118,64 @@ textarea{resize:vertical;min-height:80px}
 .file-item button{background:none;border:none;cursor:pointer;color:var(--tt);font-size:13px;padding:2px}
 .file-item button:hover{color:#E24B4A}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ===== 手機版 RWD（螢幕寬度 <=768px） ===== */
+.mobile-topbar{display:none}
+.sidebar-overlay{display:none}
+@media (max-width:768px){
+  body{display:block}
+  #login-screen{padding:16px}
+  .login-card{width:100%;max-width:360px;padding:28px 22px 24px}
+
+  .mobile-topbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:120;background:var(--cp);border-bottom:0.5px solid var(--bt);padding:10px 14px;height:52px}
+  .mobile-topbar .mt-burger{background:none;border:none;font-size:22px;color:var(--tp);cursor:pointer;padding:6px;line-height:1;flex-shrink:0}
+  .mobile-topbar .mt-title{font-size:14px;font-weight:500;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  #app-screen{display:block}
+  .sidebar{position:fixed;top:0;left:0;height:100vh;width:80vw;max-width:280px;z-index:250;transform:translateX(-100%);transition:transform .25s ease;box-shadow:2px 0 16px rgba(0,0,0,.15)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:240}
+  .main{width:100%;padding:14px 12px 28px}
+
+  .ptitle{font-size:16px}
+  .card{padding:12px 12px}
+  /* 表格外層允許橫向捲動，避免整頁被撐開；覆蓋原本inline寫死的 overflow:hidden */
+  .card{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  .vtbl{min-width:640px}
+  .vtbl th,.vtbl td{padding:9px 10px;font-size:12px}
+  .vtbl td[style*="display:flex"]{min-width:220px}
+
+  /* 觸控按鈕加大，避免誤觸 */
+  .btn{padding:8px 13px;font-size:12.5px;min-height:34px}
+  .btn-sm{padding:7px 11px;font-size:11.5px;min-height:30px}
+  .ni,.nch{padding-top:11px;padding-bottom:11px}
+
+  .modal{width:calc(100vw - 24px);max-width:480px;max-height:88vh}
+  .modal-hdr{padding:12px 14px}
+  .modal-body{padding:14px}
+  .modal-ftr{padding:10px 14px;flex-wrap:wrap}
+
+  .fg2{grid-template-columns:1fr}
+
+  /* 搜尋框＋排序選單這類橫排區塊，手機版改直排 */
+  div[style*="display:flex"][style*="min-width:200px"]{flex-direction:column;align-items:stretch!important}
+  .sb{margin-bottom:8px}
+
+  .filter-row{gap:8px}
+  .info-box,.warn-box{padding:9px 11px;font-size:11.5px}
+}
 </style>
+
+<script>
+function toggleMobileSidebar(forceState){
+  const sb=document.querySelector('.sidebar');
+  const ov=document.querySelector('.sidebar-overlay');
+  if(!sb||!ov)return;
+  const willOpen = typeof forceState==='boolean' ? forceState : !sb.classList.contains('open');
+  sb.classList.toggle('open', willOpen);
+  ov.classList.toggle('open', willOpen);
+}
+</script>
 </head>
 <body>
 
@@ -138,6 +195,11 @@ textarea{resize:vertical;min-height:80px}
 </div>
 
 <div id="app-screen" style="display:none">
+  <div class="mobile-topbar">
+    <button class="mt-burger" onclick="toggleMobileSidebar()" aria-label="開啟選單"><i class="ti ti-menu-2"></i></button>
+    <span class="mt-title">規章查找系統</span>
+  </div>
+  <div class="sidebar-overlay" onclick="toggleMobileSidebar(false)"></div>
   <nav class="sidebar">
     <div class="sh"><div class="sl">規章查找系統</div><div class="ss">臺中捷運股份有限公司</div><div class="su"><span id="lv-badge" class="badge"></span><span id="uid-disp" style="margin-left:4px;font-size:11px"></span></div></div>
     <div class="nsec">查詢</div>
@@ -169,7 +231,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 30</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 31</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -308,6 +370,7 @@ function gp(key,el,param){
   document.querySelectorAll('.ni,.nch').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   try{ sessionStorage.setItem('lastRoute', JSON.stringify({key, param: param||null})); }catch(e){}
+  if(window.innerWidth<=768) toggleMobileSidebar(false);
   const r=document.getElementById('main');
   const map={
     readme:pageReadme,search:pageSearch,
