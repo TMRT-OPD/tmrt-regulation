@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 24</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 25</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -3093,6 +3093,17 @@ function showSheetsDiff(idx){
     if(p._contentChanged){
       const oldContent=p._oldData?(p._oldData.content||''):'';
       const merged=mergeContent(oldContent, p.content||'');
+      const hasBaseline=p._oldData && p._oldData.lastSheetContent!==undefined;
+      const baseline=hasBaseline?p._oldData.lastSheetContent:oldContent;
+      const normWsDiag=s=>(s||'').replace(/[\s\u3000]+/g,' ').trim();
+      blocks+=`<div style="margin-bottom:18px;background:#fff8e1;border:0.5px solid #f0e0a0;border-radius:var(--rm);padding:10px;font-size:11.5px;color:var(--ts)">
+        <div style="font-weight:600;margin-bottom:6px">🔍 診斷資訊（除錯用）</div>
+        此筆資料庫中是否已有「上次同步基準」欄位：<b>${hasBaseline?'有':'沒有（可能尚未套用過新版比對邏輯，或這是舊資料）'}</b><br>
+        同步基準字數（正規化空白後）：<b>${normWsDiag(baseline).length}</b> 字<br>
+        Sheets 目前內容字數（正規化空白後）：<b>${normWsDiag(p.content).length}</b> 字<br>
+        兩者是否相同：<b style="color:${normWsDiag(baseline)===normWsDiag(p.content)?'#27500A':'#E24B4A'}">${normWsDiag(baseline)===normWsDiag(p.content)?'相同（不應判定為異動，若仍出現請截圖回報）':'不同'}</b>
+        <div style="margin-top:8px"><div style="font-size:11px;color:var(--ts);margin-bottom:2px">同步基準原始內容：</div><div style="white-space:pre-wrap;padding:6px;background:#fff;border:0.5px solid #e0d0a0;max-height:150px;overflow-y:auto">${baseline?escapeHtml(baseline):'（空白）'}</div></div>
+      </div>`;
       blocks+=`<div style="margin-bottom:18px">
         <div style="font-size:12px;font-weight:600;color:var(--tp);margin-bottom:6px">內容（自動合併預覽，確認匯入後會存成這樣）</div>
         <div style="white-space:pre-wrap;font-size:12.5px;padding:8px;background:#f0f7ff;border:0.5px solid #b8d4f0;border-radius:var(--rm);max-height:360px;overflow-y:auto">${escapeHtml(merged)}</div>
