@@ -169,7 +169,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 21</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 22</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -3019,28 +3019,31 @@ async function importFromSheets(){
     const snap=await getDocs(collection(window._db,'duty_briefs'));
     const existMap=new Map();
     snap.forEach(doc=>{const d=doc.data();existMap.set((d.title||'')+'|'+(d.issuedDate||''),{id:doc.id,data:d});});
+    const normWs=s=>(s||'').replace(/[\s\u3000]+/g,' ').trim();
     const FIELDS_TO_COMPARE=[['category','分類'],['announcer','宣達者'],['expiryDate','到期日期'],['content','內容']];
     parsed.forEach(p=>{
       const key=p.title+'|'+p.issuedDate;
       const existing=existMap.get(key);
       if(!existing){p._status='new';return;}
-      const changed=FIELDS_TO_COMPARE.filter(([f])=>String(p[f]||'')!==String(existing.data[f]||'')).map(([,label])=>label);
+      const changed=FIELDS_TO_COMPARE.filter(([f])=>normWs(p[f])!==normWs(existing.data[f])).map(([,label])=>label);
       if(changed.length===0){p._status='dup';}
-      else{p._status='update';p._docId=existing.id;p._changed=changed;}
+      else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;}
     });
     const newRows=parsed.filter(p=>p._status==='new');
     const updateRows=parsed.filter(p=>p._status==='update');
     const dupCount=parsed.filter(p=>p._status==='dup').length;
     window._sheetsImportRows=[...newRows,...updateRows];
-    const renderRow=p=>{const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
+    let rowIdx=0;
+    const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
     area.innerHTML=`
-      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（將更新）、${newRows.length} 筆為全新資料</div>
-      ${(newRows.length+updateRows.length)?`<div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
-        <table class="vtbl"><thead><tr><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆內容有異動（預設將更新，可取消勾選略過）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）</div>
+      ${(newRows.length+updateRows.length)?`<div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="sheets-select-all" checked onchange="document.querySelectorAll('.sheets-row-chk').forEach(c=>c.checked=this.checked)"> 全選／全不選</label></div>
+      <div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
+        <table class="vtbl"><thead><tr><th style="width:36px"></th><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
         <tbody>${newRows.map(renderRow).join('')}${updateRows.map(renderRow).join('')}</tbody>
         </table></div>
-        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空；標記黃字（異動：⋯）表示此筆在資料庫中已存在但內容有變動，確認後將直接更新既有資料，不會產生重複</div>
-        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入（新增 ${newRows.length}／更新 ${updateRows.length}）</button>`
+        <div class="info-box" style="margin-top:10px"><i class="ti ti-info-circle"></i>標記紅字的資料列（分類辨識失敗、缺宣達者或缺發布日期）仍會照常匯入，缺漏欄位將留空；標記黃字（異動：⋯）表示此筆在資料庫中已存在但內容有變動，勾選確認後將直接更新既有資料，不會產生重複——如果不確定異動是否為預期中的修改，可先取消勾選跳過，之後再自行確認</div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="confirmSheetsImport()"><i class="ti ti-check"></i> 確認匯入已勾選項目</button>`
       :'<div class="pholder">沒有新資料或異動需要處理</div>'}
     `;
   }catch(e){
@@ -3049,14 +3052,17 @@ async function importFromSheets(){
 }
 
 async function confirmSheetsImport(){
-  const rows=window._sheetsImportRows||[];
-  if(rows.length===0)return;
+  const allRows=window._sheetsImportRows||[];
+  const checkedIdx=new Set(Array.from(document.querySelectorAll('.sheets-row-chk:checked')).map(el=>parseInt(el.dataset.idx)));
+  const rows=allRows.filter((p,i)=>checkedIdx.has(i));
+  if(rows.length===0){showToast('請至少勾選一筆項目');return;}
   const area=document.getElementById('sheets-preview-area');
   const btn=area.querySelector('.btn-primary');
   setBtnLoading(btn,`處理中…(0/${rows.length})`);
   try{
     const {collection, doc, writeBatch, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     let added=0, updated=0, incomplete=0, done=0;
+    const logEntries=[];
     const CHUNK=400; // 低於 Firestore 單一 batch 500 筆上限，保留餘裕
     for(let i=0;i<rows.length;i+=CHUNK){
       const chunk=rows.slice(i,i+CHUNK);
@@ -3070,6 +3076,7 @@ async function confirmSheetsImport(){
             updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
           });
           updated++;
+          logEntries.push({docId:p._docId, title:p.title, extra:`Sheets更新，異動欄位：${(p._changed||[]).join('、')}`});
         } else {
           const ref=doc(collection(window._db,'duty_briefs'));
           batch.set(ref,{
@@ -3079,6 +3086,7 @@ async function confirmSheetsImport(){
             createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
           });
           added++;
+          logEntries.push({docId:ref.id, title:p.title, extra:'Sheets新增'});
         }
       }
       await batch.commit();
@@ -3086,9 +3094,13 @@ async function confirmSheetsImport(){
       if(btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 處理中…(${done}/${rows.length})`;
     }
     setBtnSuccess(btn,'已完成');
-    if(added>0||updated>0) await logActivity('duty','batch_create','',`Sheets匯入：新增${added}筆、更新${updated}筆`);
-    showToast(`新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料`:''}`);
-    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已完成：新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整處理，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}</div>`;
+    // 逐筆記錄異動明細，之後可在操作紀錄查到每一筆確切改了什麼
+    for(const le of logEntries){
+      await logActivity('duty', le.extra.startsWith('Sheets新增')?'create':'update', le.docId, le.title, le.extra);
+    }
+    const skipped=allRows.length-rows.length;
+    showToast(`新增 ${added} 筆、更新 ${updated} 筆${incomplete?`，其中 ${incomplete} 筆欄位不全，已保留原資料`:''}${skipped?`，另有 ${skipped} 筆未勾選已略過`:''}`);
+    area.innerHTML=`<div class="info-box"><i class="ti ti-info-circle"></i>已完成：新增 ${added} 筆、更新 ${updated} 筆${skipped?`，${skipped} 筆未勾選已略過`:''}${incomplete?`，其中 ${incomplete} 筆缺分類／宣達者／發布日期，資料仍完整處理，僅缺漏欄位留空，請於「勤前指示」頁面手動補登`:''}（每筆異動明細已記錄於操作紀錄，可供查詢）</div>`;
   }catch(e){
     setBtnError(btn);
     showToast('處理失敗：'+e.message);
