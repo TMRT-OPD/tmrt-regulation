@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 33</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 34</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1905,14 +1905,22 @@ async function findActiveDoc(collectionName, field, value, title){
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
-  let result = null;
+  let exactMatch = null, titleMismatch = null;
   snap.forEach(d => {
     const data=d.data();
-    // 若有提供title，必須連名稱也一致才視為同一份文件的新版次；名稱不同則視為獨立文件，不觸發版本取代
-    if(title!==undefined && normTitle(data.title)!==normTitle(title)) return;
-    result = {id: d.id, data};
+    if(title!==undefined && normTitle(data.title)!==normTitle(title)){
+      titleMismatch = {id: d.id, data}; // 名稱對不起來的候選，留給下面詢問使用者
+      return;
+    }
+    exactMatch = {id: d.id, data};
   });
-  return result;
+  if (exactMatch) return exactMatch;
+  if (titleMismatch && title !== undefined) {
+    // 編號相同、名稱不同：可能是同一份文件改了用字，也可能真的是不同文件，交由使用者當下判斷
+    const ok = confirm(`資料庫已有相同編號「${value}」但名稱不同的現有文件：\n「${titleMismatch.data.title}」（版次 ${titleMismatch.data.version||'—'}）\n\n這是同一份文件改了名稱、要更新為新版次嗎？\n\n選「確定」：視為同一份文件的新版本，將取代舊版\n選「取消」：視為全新獨立文件，兩者都會保留`);
+    if (ok) return titleMismatch;
+  }
+  return null;
 }
 async function supersedeDoc(collectionName, docId, newDocId){
   const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
