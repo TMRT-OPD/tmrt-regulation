@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 39</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 40</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1176,7 +1176,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
 </div></div>`;}
 
 function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告上傳</div><div class="psub">發布通告，將列入效期內通告頁面</div>
-<div class="tabs"><div class="tab active" onclick="switchTab(this,'nb-m')">手動新增</div><div class="tab" onclick="switchTab(this,'nb-b')">批次上傳（資料夾）</div></div>
+<div class="tabs"><div class="tab active" onclick="switchTab(this,'nb-m')">手動新增</div><div class="tab" onclick="switchTab(this,'nb-b')">批次上傳（資料夾）</div><div class="tab" onclick="switchTab(this,'nb-l')">清單比對匯入</div></div>
 <div class="tabpane active" id="nb-m"><div class="card">
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告編號</label><input type="text" id="nno" placeholder="例：SOC-1150715-02"></div><div><label class="fl2">發布單位 *</label>${unitSelectHtml('nu',NOTICE_DEPTS,'')}</div></div>
   <div style="margin-bottom:12px"><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div>
@@ -1201,6 +1201,14 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <input type="file" id="notice-batch-folder" webkitdirectory directory multiple style="display:none" onchange="handleNoticeBatchFiles(this)">
   <input type="file" id="notice-batch-files" accept=".pdf" multiple style="display:none" onchange="handleNoticeBatchFiles(this)">
   <div id="notice-batch-preview"></div>
+</div></div>
+<div class="tabpane" id="nb-l"><div class="card">
+  <div class="info-box"><i class="ti ti-info-circle"></i>上傳中心發布的通告清單（Excel），系統會依「通告編號」逐筆比對資料庫，列出「已建置」與「尚未建置」的通告，尚未建置的可直接用清單資料一鍵建立（PDF/Word附件可之後再用編輯功能補上）；標題列須包含：發布單位、通告編號、通告名稱（或修正之規章/章/節或內容）、生效日期、失效日期</div>
+  <div style="margin-bottom:12px">
+    <div id="notice-list-drop-zone" class="upload-zone" onclick="document.getElementById('notice-list-file').click()"><i class="ti ti-file-spreadsheet"></i><span>點擊或將 Excel 清單拖曳至此處</span></div>
+    <input type="file" id="notice-list-file" accept=".xlsx,.xls" style="display:none" onchange="handleNoticeListFile(this)">
+  </div>
+  <div id="notice-list-result"></div>
 </div></div>`;}
 
 function pageUploadReg(){return`<div class="ptitle">後臺控管 — 規章上傳</div><div class="psub">上傳後自動更新規章，並保留版本歷史</div>
@@ -2868,6 +2876,116 @@ async function confirmNoticeBatchUpload(){
   } catch(e) {
     setBtnError(btn);
     showToast('批次上傳失敗：'+e.message);
+  }
+}
+
+// ===== 通告清單比對匯入：讀取中心發布的Excel清單，依通告編號比對資料庫，列出尚未建置的項目 =====
+async function handleNoticeListFile(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const area = document.getElementById('notice-list-result');
+  area.innerHTML = '<div class="pholder">讀取中…</div>';
+  try {
+    const XLSX = await ensureXlsx();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+    let headerIdx = -1, headerRow = [];
+    for (let i=0; i<Math.min(aoa.length,10); i++) {
+      if (aoa[i].some(c => String(c).includes('通告編號'))) { headerIdx = i; headerRow = aoa[i]; break; }
+    }
+    if (headerIdx < 0) { area.innerHTML = '<div class="pholder">找不到「通告編號」欄位，請確認Excel標題列格式</div>'; return; }
+    const findCol = (keywords) => {
+      for (let c=0; c<headerRow.length; c++) {
+        const h = String(headerRow[c]||'');
+        if (keywords.some(k => h.includes(k))) return c;
+      }
+      return -1;
+    };
+    const cUnit = findCol(['發布單位']);
+    const cNo = findCol(['通告編號']);
+    const cTitle = findCol(['通告名稱']);
+    const cContent = findCol(['修正之規章','內容']);
+    const cFrom = findCol(['生效日期']);
+    const cTo = findCol(['失效日期','有效期限']);
+    const cNote = findCol(['備註']);
+    const rows = [];
+    for (let i=headerIdx+1; i<aoa.length; i++) {
+      const row = aoa[i];
+      if (!row || row.every(c => String(c).trim()==='')) continue;
+      const noticeNo = cNo>=0 ? String(row[cNo]||'').trim() : '';
+      if (!noticeNo) continue;
+      const contentRaw = cContent>=0 ? String(row[cContent]||'').trim() : '';
+      const regMatch = contentRaw.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+      rows.push({
+        noticeNo,
+        unit: cUnit>=0 ? String(row[cUnit]||'').trim() : '',
+        title: cTitle>=0 ? String(row[cTitle]||'').trim() : '',
+        content: contentRaw,
+        issuedDate: cFrom>=0 ? parseMinguoDate(String(row[cFrom]||'').trim()) : '',
+        expiryDate: cTo>=0 ? parseMinguoDate(String(row[cTo]||'').trim()) : '',
+        linkedRegulation: regMatch ? regMatch[0].toUpperCase() : '',
+        note: cNote>=0 ? String(row[cNote]||'').trim() : ''
+      });
+    }
+    if (rows.length === 0) { area.innerHTML = '<div class="pholder">沒有讀到任何有效資料列</div>'; return; }
+    const {collection, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap = await getDocs(collection(window._db, 'notices'));
+    const existingNos = new Set();
+    snap.forEach(d => { const dat=d.data(); if (dat.noticeNo) existingNos.add(String(dat.noticeNo).toUpperCase()); });
+    rows.forEach(r => { r.exists = existingNos.has(r.noticeNo.toUpperCase()); });
+    window._noticeListRows = rows;
+    renderNoticeListResult();
+  } catch(e) {
+    area.innerHTML = `<div class="pholder">讀取失敗：${e.message}</div>`;
+  }
+}
+
+function renderNoticeListResult(){
+  const rows = window._noticeListRows || [];
+  const area = document.getElementById('notice-list-result');
+  if (!area) return;
+  const missing = rows.filter(r => !r.exists);
+  const existingCount = rows.length - missing.length;
+  area.innerHTML = `
+    <div class="info-box" style="margin-bottom:10px"><i class="ti ti-info-circle"></i>清單共 ${rows.length} 筆，已建置 ${existingCount} 筆，尚未建置 ${missing.length} 筆</div>
+    ${missing.length ? `<div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#856404">尚未建置（${missing.length}）</div>` + missing.map(r => {
+      const idx = rows.indexOf(r);
+      return `<div class="list-card" style="border-left-color:#856404">
+        <div style="font-size:13px;font-weight:600">${escapeHtml(r.title||'（無標題）')} <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(r.noticeNo)}）</span></div>
+        <div style="font-size:12px;color:var(--ts);margin-top:6px">發布單位：${escapeHtml(r.unit||'—')}　生效：${r.issuedDate||'—'}　失效：${r.expiryDate||'—'}${r.note?'　備註：'+escapeHtml(r.note):''}</div>
+        <div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="createNoticeFromListRow(${idx})"><i class="ti ti-plus"></i> 用此資料建立通告</button></div>
+      </div>`;
+    }).join('') : '<div class="info-box"><i class="ti ti-circle-check"></i>清單裡的通告全部都已建置</div>'}
+  `;
+}
+
+async function createNoticeFromListRow(idx){
+  const r = (window._noticeListRows||[])[idx];
+  if (!r) return;
+  if (!confirm(`確定要用清單資料建立這筆通告嗎？\n「${r.title}」（${r.noticeNo}）\n\n建立後尚無附件，之後請用編輯功能或重新上傳補上PDF/Word檔案。`)) return;
+  try {
+    const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const newRef = await addDoc(collection(window._db, 'notices'), {
+      title: r.title || r.noticeNo,
+      noticeNo: r.noticeNo,
+      unit: r.unit || '',
+      category: NOTICE_UNIT_TO_CATEGORY[r.unit] || '',
+      issuedDate: r.issuedDate || null,
+      expiryDate: r.expiryDate || null,
+      extended: false, revised: false,
+      content: r.content || '',
+      linkedRegulation: r.linkedRegulation || '',
+      attachments: [], fullText: '', status: 'active',
+      createdAt: serverTimestamp(), createdBy: window._uid, importedFromList: true
+    });
+    await logActivity('notice','create',newRef.id,r.title,'由通告清單比對建立（尚無附件）',r.unit);
+    r.exists = true;
+    showToast('已建立，記得之後補上附件');
+    renderNoticeListResult();
+  } catch(e) {
+    showToast('建立失敗：'+e.message);
   }
 }
 
