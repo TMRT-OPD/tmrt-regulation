@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 40</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 41</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -390,7 +390,7 @@ function gp(key,el,param){
   if(key==='admin-upload-reg') initDropZone('reg-drop-zone','rfs','rfl');
   if(key==='admin-upload-form') initDropZone('form-drop-zone','ffs','ffl');
   if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); }
-  if(key==='admin-upload-notice') initDropZone('notice-drop-zone','nfs','nfl');
+  if(key==='admin-upload-notice') { initDropZone('notice-drop-zone','nfs','nfl'); initDropZone('notice-list-drop-zone','notice-list-file',null); }
 }
 
 function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">系統說明與參考依據</div>
@@ -1193,13 +1193,13 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nno','nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="nb-b"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾，系統會逐一解析通告PDF檔名（辨識通告編號、發布單位、生效日期、關聯規章編號），並擷取全文供日後搜尋使用；辨識完可逐筆編輯修正，確認後才會送出；PDF檔案將作為該筆通告的附件保存</div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾（支援PDF與Word檔案），系統會逐一解析檔名（辨識通告編號、發布單位、生效日期、關聯規章編號），並擷取全文供日後搜尋使用（Word為文字型檔案時可直接擷取；PDF若為掃描件將自動改用OCR辨識，速度較慢）；辨識完可逐筆編輯修正，確認後才會送出；檔案將作為該筆通告的附件保存</div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn btn-primary" onclick="document.getElementById('notice-batch-folder').click()"><i class="ti ti-folder"></i> 選擇資料夾</button>
     <button class="btn" onclick="document.getElementById('notice-batch-files').click()"><i class="ti ti-files"></i> 或選擇多個檔案</button>
   </div>
   <input type="file" id="notice-batch-folder" webkitdirectory directory multiple style="display:none" onchange="handleNoticeBatchFiles(this)">
-  <input type="file" id="notice-batch-files" accept=".pdf" multiple style="display:none" onchange="handleNoticeBatchFiles(this)">
+  <input type="file" id="notice-batch-files" accept=".pdf,.doc,.docx" multiple style="display:none" onchange="handleNoticeBatchFiles(this)">
   <div id="notice-batch-preview"></div>
 </div></div>
 <div class="tabpane" id="nb-l"><div class="card">
@@ -2077,6 +2077,8 @@ async function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>`;
   } else if(kind==='notice'){
     titleEl.textContent='編輯通告';
+    window._editNoticeAttachments = JSON.parse(JSON.stringify(d.attachments||[]));
+    const attList = (window._editNoticeAttachments||[]).map((a,i)=>`<div class="file-item" id="ed-att-${i}"><i class="ti ti-paperclip"></i><span>${escapeHtml(a.name)}</span><button onclick="removeEditNoticeAttachment('${escapeHtml(a.url||'').replace(/'/g,"\\'")}')"><i class="ti ti-x"></i></button></div>`).join('');
     html=`
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">通告編號</label><input type="text" id="ed-noticeNo" value="${escapeHtml(d.noticeNo||'')}" placeholder="例：SOC-1150715-02"></div>
@@ -2092,6 +2094,12 @@ async function openEdit(kind, docId){
         <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
       <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>
+      <div style="margin-bottom:12px"><label class="fl2">附件</label>
+        <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
+        <div style="margin-top:8px"><label class="btn btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> 新增／替換附件<input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list')"></label></div>
+        <div class="file-list" id="ed-nfs-list" style="margin-top:6px"></div>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若要整份取代舊附件，先移除舊附件再新增</div>
+      </div>
       <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇</div>`;
   } else if(kind==='regulation'){
     titleEl.textContent='編輯規章資訊';
@@ -2120,6 +2128,19 @@ async function openEdit(kind, docId){
   document.getElementById('modal-edit').classList.add('open');
 }
 
+function removeEditNoticeAttachment(url){
+  if (!window._editNoticeAttachments) return;
+  const idx = window._editNoticeAttachments.findIndex(a => a.url === url);
+  if (idx < 0) return;
+  window._editNoticeAttachments.splice(idx, 1);
+  const el = document.getElementById('ed-att-'+idx);
+  if (el) el.remove();
+  // 移除後，剩餘項目的DOM id仍對應原始index，重新編號避免下一次移除找不到元素
+  const list = document.getElementById('ed-att-list');
+  if (list) {
+    Array.from(list.children).forEach((child, newIdx) => { child.id = 'ed-att-'+newIdx; });
+  }
+}
 async function saveEdit(){
   const ctx=window._editContext;
   if(!ctx)return;
@@ -2158,6 +2179,25 @@ async function saveEdit(){
       payload.extended=document.getElementById('ed-extended')?.value==='1';
       payload.revised=document.getElementById('ed-revised')?.value==='1';
       payload.content=document.getElementById('ed-content')?.value||'';
+      const attachments = [...(window._editNoticeAttachments||[])];
+      const newFileInput = document.getElementById('ed-nfs');
+      let appendedText = '';
+      if (newFileInput && newFileInput.files.length > 0) {
+        if (btn) btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在上傳新附件並擷取全文…';
+        for (const file of newFileInput.files) {
+          const url = await uploadFile(file, `notices/${new Date().getFullYear()}/${Date.now()}_${file.name}`);
+          attachments.push({name: file.name, url, size: file.size});
+          if (isExtractableFile(file.name)) {
+            try {
+              const {text} = await extractFileText(file, 500);
+              if (text && text.trim()) appendedText += (appendedText?'\n\n':'') + text;
+            } catch(e) { console.warn('新附件全文擷取失敗：', e); }
+          }
+        }
+      }
+      payload.attachments = attachments;
+      const existingFullText = (window._noticeDocs||[]).find(x=>x.id===docId)?.fullText || '';
+      if (appendedText) payload.fullText = existingFullText ? existingFullText+'\n\n'+appendedText : appendedText;
       localArr=window._noticeDocs; renderFn=renderNoticeList;
     } else if(kind==='regulation'){
       collectionName='regulations';
@@ -2783,16 +2823,16 @@ function guessNoticeCategory(text){
 }
 
 async function handleNoticeBatchFiles(input){
-  const files = Array.from(input.files || []).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  const files = Array.from(input.files || []).filter(f => /\.(pdf|doc|docx)$/i.test(f.name));
   const area = document.getElementById('notice-batch-preview');
-  if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到PDF檔案</div>'; return; }
+  if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到PDF或Word檔案</div>'; return; }
   area.innerHTML = `<div class="pholder">正在解析檔名並擷取全文…(0/${files.length})</div>`;
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const fnMeta = parseNoticeFilename(file.name);
     try {
-      const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
+      const {text} = await extractFileText(file, 500, (pi,pn,ptotal)=>{
         area.innerHTML = `<div class="pholder">正在擷取全文中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
       });
       rows.push({
