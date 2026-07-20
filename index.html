@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 43</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 44</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -802,8 +802,8 @@ async function loadDutyList(){
   const area=document.getElementById('duty-list-area');
   if(!area)return;
   try{
-    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const snap=await getDocs(collection(window._db,'duty_briefs'));
+    const {collection,query,where,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap=await getDocs(query(collection(window._db,'duty_briefs'),where('status','==','active')));
     window._dutyDocs=[];
     snap.forEach(doc=>window._dutyDocs.push({id:doc.id,...doc.data()}));
     const luEl=document.getElementById('duty-last-updated');
@@ -864,8 +864,8 @@ async function loadNoticeList(){
   const area=document.getElementById('notice-list-area');
   if(!area)return;
   try{
-    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const snap=await getDocs(collection(window._db,'notices'));
+    const {collection,query,where,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap=await getDocs(query(collection(window._db,'notices'),where('status','==','active')));
     window._noticeDocs=[];
     snap.forEach(doc=>window._noticeDocs.push({id:doc.id,...doc.data()}));
     const luEl=document.getElementById('notice-last-updated');
@@ -2983,8 +2983,8 @@ async function handleNoticeListFile(input){
       });
     }
     if (rows.length === 0) { area.innerHTML = '<div class="pholder">沒有讀到任何有效資料列</div>'; return; }
-    const {collection, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const snap = await getDocs(collection(window._db, 'notices'));
+    const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap = await getDocs(query(collection(window._db, 'notices'), where('status','==','active')));
     const existingNos = new Set();
     snap.forEach(d => { const dat=d.data(); if (dat.noticeNo) existingNos.add(String(dat.noticeNo).toUpperCase()); });
     rows.forEach(r => { r.exists = existingNos.has(r.noticeNo.toUpperCase()); });
@@ -3558,8 +3558,8 @@ async function importFromSheets(){
       });
     }
     if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
-    const {collection,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const snap=await getDocs(collection(window._db,'duty_briefs'));
+    const {collection,query,where,getDocs}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap=await getDocs(query(collection(window._db,'duty_briefs'),where('status','==','active')));
     // 比對鍵值＝標題+發布日期+項次，可正確分辨「同標題同日期但項次不同」的獨立資料列
     // legacyMap 保留給尚未儲存過「項次」欄位的舊資料，讓第一筆對上的Sheets列可以完成一次性遷移，避免誤判成新增造成重複
     const existMap=new Map();
