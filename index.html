@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 36</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 37</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1187,8 +1187,9 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="nreg" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
   <div style="margin-bottom:12px"><label class="fl2">附件</label>
     <div id="notice-drop-zone" class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處</span></div>
-    <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl')">
-    <div class="file-list" id="nfl"></div></div>
+    <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl');autoFillNoticeFromPdf(this)">
+    <div class="file-list" id="nfl"></div>
+    <div id="notice-extract-status" style="font-size:12px;margin-top:6px;color:var(--ts)"></div></div>
   <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次</div>
   <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
@@ -1968,18 +1969,20 @@ async function saveNotice() {
       revised: document.getElementById('nr')?.value === '1',
       content: document.getElementById('nc')?.value || '',
       linkedRegulation: document.getElementById('nreg')?.value || '',
-      attachments, status: 'active',
+      attachments, fullText: window._noticeExtractedText || '', status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
     await logActivity('notice','create',newRef.id,title,'',getUnitValue('nu'));
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
+    window._noticeExtractedText = '';
     ['nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
     const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const ncatEl = document.getElementById('ncat'); if (ncatEl) ncatEl.value = '';
     const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
+    const stEl = document.getElementById('notice-extract-status'); if (stEl) stEl.innerHTML = '';
   } catch(e) {
     setBtnError(btn);
     showToast('發布失敗：' + e.message);
@@ -2496,6 +2499,43 @@ async function autoFillFormFromPdf(input){
     if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到表單編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳${fnMeta?'，已從檔名帶入部分欄位':''}）</span>`;
+  }
+}
+
+async function autoFillNoticeFromPdf(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const st = document.getElementById('notice-extract-status');
+  if (!isExtractableFile(file.name)) {
+    const ntEl = document.getElementById('nt'); if (ntEl && !ntEl.value) ntEl.value = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
+    if (st) st.innerHTML = '<span style="color:#856404">此檔案格式無法自動擷取全文，已用檔名帶入標題，其餘欄位請手動填寫</span>';
+    return;
+  }
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
+  try {
+    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
+    });
+    window._noticeExtractedText = text;
+    const norm = normalizeExtractedText(text);
+    const compact = norm.replace(/\s+/g,'');
+    const bm = norm.match(/【([\s\S]+?)】/);
+    let title = bm ? bm[1].replace(/\s+/g,'').trim() : '';
+    if (!title) title = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
+    const fromMatch = norm.match(new RegExp('(?:'+flexLabel('發布日期')+'|'+flexLabel('生效日期')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
+    const toMatch = norm.match(new RegExp('(?:'+flexLabel('到期日期')+'|'+flexLabel('失效日期')+'|'+flexLabel('有效期限至')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
+    const regMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+    const catGuess = guessNoticeCategory(norm);
+
+    const ntEl = document.getElementById('nt'); if (ntEl && !ntEl.value) ntEl.value = title;
+    const ncatEl = document.getElementById('ncat'); if (ncatEl && !ncatEl.value && catGuess) ncatEl.value = catGuess;
+    const nfEl = document.getElementById('nf'); if (nfEl && !nfEl.value && fromMatch) nfEl.value = parseMinguoDate(fromMatch[1]);
+    const neEl = document.getElementById('ne'); if (neEl && !neEl.value && toMatch) neEl.value = parseMinguoDate(toMatch[1]);
+    const nregEl = document.getElementById('nreg'); if (nregEl && !nregEl.value && regMatch) nregEl.value = regMatch[0].toUpperCase();
+
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤（分類/日期為系統猜測，請務必核對）${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+  } catch(e) {
+    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳）</span>`;
   }
 }
 
