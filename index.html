@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 44</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 45</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2600,8 +2600,10 @@ async function autoFillNoticeFromPdf(input){
     }
   }
   window._noticeExtractedText = combinedText;
-  // 內文擷取（尤其OCR結果）不夠可靠，僅用於全文搜尋，不再拿來覆蓋欄位；標題/日期/單位一律以檔名解析為準
-  if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取 ${extractableFiles.length-failCount}/${extractableFiles.length} 個 Word 檔的全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${pdfCount?`　<span style="color:var(--ts)">（另有 ${pdfCount} 個PDF僅作為附件保存，不擷取全文）</span>`:''}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
+  // 通告內容欄位自動帶入
+  const ncEl = document.getElementById('nc');
+  if (ncEl && !ncEl.value && combinedText) ncEl.value = extractNoticeContentFromText(combinedText);
+  if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位、':''}從 Word 檔帶入通告內容並擷取全文供搜尋（共 ${extractableFiles.length-failCount}/${extractableFiles.length} 個檔案，請確認內容有無多餘表格文字）${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${pdfCount?`　<span style="color:var(--ts)">（另有 ${pdfCount} 個PDF僅作為附件保存，不擷取全文）</span>`:''}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
 }
 
 // ===== 批次上傳：規章 =====
@@ -2912,7 +2914,7 @@ async function confirmNoticeBatchUpload(){
           noticeNo: r.noticeNo || '', unit: r.unit || '',
           issuedDate: r.issuedDate || null, expiryDate: r.expiryDate || null,
           extended: false, revised: false,
-          content: '', linkedRegulation: r.linkedRegulation || '',
+          content: extractNoticeContentFromText(r.text), linkedRegulation: r.linkedRegulation || '',
           attachments: [{name: r.file.name, url: fileUrl, size: r.file.size}],
           fullText: r.text || '', status: 'active',
           createdAt: serverTimestamp(), createdBy: window._uid, importedFromBatch: true
@@ -3236,6 +3238,12 @@ function parseNoticeFilename(fileName){
   rest = rest.replace(/^[\s_]*[運行站票維工][務控務務修安][處中心處廠處][^_]{0,4}通告/, ''); // 去掉開頭「XX中心通告」這類前綴（若有）
   const title = rest.replace(/[_]+/g, ' ').replace(/^[\s_（(]+|[\s_）)]+$/g, '').trim();
   return {noticeNo, unit, issuedDate, linkedRegulation, title};
+}
+function extractNoticeContentFromText(text){
+  // 通告內容欄位帶入用：優先取文字中【】括號開始的段落（通常是主旨後的正式內容起點，較乾淨），抓不到就整段帶入
+  if (!text) return '';
+  const bracketIdx = text.indexOf('【');
+  return (bracketIdx >= 0 ? text.slice(bracketIdx) : text).trim();
 }
 
 // ===== Word/Excel 全文擷取 =====
