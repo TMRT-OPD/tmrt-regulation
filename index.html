@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 42</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 43</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2187,7 +2187,7 @@ async function saveEdit(){
         for (const file of newFileInput.files) {
           const url = await uploadFile(file, `notices/${new Date().getFullYear()}/${Date.now()}_${file.name}`);
           attachments.push({name: file.name, url, size: file.size});
-          if (isExtractableFile(file.name)) {
+          if (isNoticeExtractableFile(file.name)) {
             try {
               const {text} = await extractFileText(file, 500);
               if (text && text.trim()) appendedText += (appendedText?'\n\n':'') + text;
@@ -2578,23 +2578,21 @@ async function autoFillNoticeFromPdf(input){
   const nregEl0 = document.getElementById('nreg'); if (nregEl0 && !nregEl0.value && fnMeta.linkedRegulation) nregEl0.value = fnMeta.linkedRegulation;
   if (!ntEl0.value) ntEl0.value = files[0].name.replace(/\.[a-zA-Z0-9]+$/,'');
 
-  const extractableFiles = files.filter(f => isExtractableFile(f.name));
+  const extractableFiles = files.filter(f => isNoticeExtractableFile(f.name));
+  const pdfCount = files.filter(f => f.name.toLowerCase().endsWith('.pdf')).length;
   if (extractableFiles.length === 0) {
     if (st) st.innerHTML = fnMeta.noticeNo
-      ? `<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（${files.length>1?'所選檔案':'此檔案'}格式皆無法擷取全文索引）`
+      ? `<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤${pdfCount?`（PDF僅作為附件保存，不擷取全文；如需搜尋內文請另外附上.docx）`:'（此檔案格式無法擷取全文索引）'}`
       : '<span style="color:#856404">所選檔案格式無法自動擷取全文，檔名也未能辨識出通告編號，請手動填寫</span>';
     return;
   }
-  if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 已從檔名帶入欄位，正在擷取全文供日後搜尋用（共 ${extractableFiles.length} 個檔案可擷取；若為掃描件將自動改用OCR辨識，速度會較慢）…`;
+  if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 已從檔名帶入欄位，正在擷取 Word 檔全文供日後搜尋用…`;
   let combinedText = '';
-  let anyOCR = false, anyTruncated = false, failCount = 0;
+  let anyTruncated = false, failCount = 0;
   for (const file of extractableFiles) {
     try {
-      const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
-        if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取「${escapeHtml(file.name)}」…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
-      });
-      if (text && text.trim()) combinedText += (combinedText?'\n\n':'') + `【來源檔案：${file.name}】\n` + text;
-      if (usedOCR) anyOCR = true;
+      const {text, truncated} = await extractFileText(file, 500);
+      if (text && text.trim()) combinedText += (combinedText?'\n\n':'') + (extractableFiles.length>1?`【來源檔案：${file.name}】\n`:'') + text;
       if (truncated) anyTruncated = true;
     } catch(e) {
       failCount++;
@@ -2603,7 +2601,7 @@ async function autoFillNoticeFromPdf(input){
   }
   window._noticeExtractedText = combinedText;
   // 內文擷取（尤其OCR結果）不夠可靠，僅用於全文搜尋，不再拿來覆蓋欄位；標題/日期/單位一律以檔名解析為準
-  if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取 ${extractableFiles.length-failCount}/${extractableFiles.length} 個檔案的全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${anyOCR?'　<span style="color:#856404">（部分文件為掃描件，已自動使用OCR辨識，準確度僅供參考）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
+  if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取 ${extractableFiles.length-failCount}/${extractableFiles.length} 個 Word 檔的全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${pdfCount?`　<span style="color:var(--ts)">（另有 ${pdfCount} 個PDF僅作為附件保存，不擷取全文）</span>`:''}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
 }
 
 // ===== 批次上傳：規章 =====
@@ -2840,27 +2838,28 @@ async function handleNoticeBatchFiles(input){
   const files = Array.from(input.files || []).filter(f => /\.(pdf|doc|docx)$/i.test(f.name));
   const area = document.getElementById('notice-batch-preview');
   if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到PDF或Word檔案</div>'; return; }
-  area.innerHTML = `<div class="pholder">正在解析檔名並擷取全文…(0/${files.length})</div>`;
+  area.innerHTML = `<div class="pholder">正在解析檔名…(0/${files.length})</div>`;
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const fnMeta = parseNoticeFilename(file.name);
-    try {
-      const {text} = await extractFileText(file, 500, (pi,pn,ptotal)=>{
-        area.innerHTML = `<div class="pholder">正在擷取全文中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
-      });
-      rows.push({
-        file, text,
-        noticeNo: fnMeta.noticeNo,
-        unit: fnMeta.unit,
-        title: fnMeta.title || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
-        issuedDate: fnMeta.issuedDate,
-        expiryDate: fnMeta.issuedDate ? addMonthsToDate(fnMeta.issuedDate, 6) : '',
-        linkedRegulation: fnMeta.linkedRegulation
-      });
-    } catch(e) {
-      rows.push({file, text:'', noticeNo:fnMeta.noticeNo, unit:fnMeta.unit, title:fnMeta.title||file.name.replace(/\.[a-zA-Z0-9]+$/,''), issuedDate:fnMeta.issuedDate, expiryDate:fnMeta.issuedDate?addMonthsToDate(fnMeta.issuedDate,6):'', linkedRegulation:fnMeta.linkedRegulation, _extractError:e.message});
+    let text = '', extractError = '';
+    if (isNoticeExtractableFile(file.name)) {
+      try {
+        const r = await extractFileText(file, 500);
+        text = r.text || '';
+      } catch(e) { extractError = e.message; }
     }
+    rows.push({
+      file, text,
+      noticeNo: fnMeta.noticeNo,
+      unit: fnMeta.unit,
+      title: fnMeta.title || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
+      issuedDate: fnMeta.issuedDate,
+      expiryDate: fnMeta.issuedDate ? addMonthsToDate(fnMeta.issuedDate, 6) : '',
+      linkedRegulation: fnMeta.linkedRegulation,
+      _extractError: extractError
+    });
     area.innerHTML = `<div class="pholder">正在解析中…(${i+1}/${files.length})</div>`;
   }
   window._noticeBatchRows = rows;
@@ -3290,6 +3289,11 @@ async function extractExcelText(file){
 function isExtractableFile(filename){
   const n=(filename||'').toLowerCase();
   return n.endsWith('.pdf')||n.endsWith('.docx')||n.endsWith('.doc')||n.endsWith('.xlsx')||n.endsWith('.xls');
+}
+function isNoticeExtractableFile(filename){
+  // 通告的全文搜尋只信任Word檔案：PDF多為簽核後掃描件，免費OCR準確度不足，乾脆不擷取，PDF僅作為附件保存
+  const n=(filename||'').toLowerCase();
+  return n.endsWith('.docx');
 }
 function isReextractableFile(filename){
   // 舊版.doc（非.docx）目前解析套件無法處理，僅.docx／PDF／Excel支援重新擷取
