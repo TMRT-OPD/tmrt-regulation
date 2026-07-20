@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 38</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 39</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -667,9 +667,11 @@ const NOTICE_CATEGORIES=[
   {id:'ext_ticket',name:'外單位通告－票務中心',bg:'#e2d9f3',text:'#3c2a6e'},
   {id:'ext_occ',name:'外單位通告－行控中心',bg:'#e2d9f3',text:'#3c2a6e'},
   {id:'ext_hq',name:'外單位通告－處本部',bg:'#e2d9f3',text:'#3c2a6e'},
-  {id:'ext_maint',name:'外單位通告－維修處',bg:'#e2d9f3',text:'#3c2a6e'}
+  {id:'ext_maint',name:'外單位通告－維修處',bg:'#e2d9f3',text:'#3c2a6e'},
+  {id:'ext_isd',name:'外單位通告－工安處',bg:'#e2d9f3',text:'#3c2a6e'}
 ];
 const NOTICE_DEPTS=['運務處','行控中心','站務中心','票務中心','維修處','工安處'];
+const NOTICE_UNIT_TO_CATEGORY={'站務中心':'station','票務中心':'ext_ticket','行控中心':'ext_occ','運務處':'ext_hq','維修處':'ext_maint','工安處':'ext_isd'};
 function unitSelectHtml(id,list,current){
   const cur=current||'';
   const isOther=cur&&!list.includes(cur);
@@ -909,7 +911,7 @@ function renderNoticeList(){
         ${d.extended?'<span class="tag tag-unrevised" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
-      <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
+      <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}${d.noticeNo?` <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(d.noticeNo)}）</span>`:''}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
@@ -1176,13 +1178,10 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
 function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告上傳</div><div class="psub">發布通告，將列入效期內通告頁面</div>
 <div class="tabs"><div class="tab active" onclick="switchTab(this,'nb-m')">手動新增</div><div class="tab" onclick="switchTab(this,'nb-b')">批次上傳（資料夾）</div></div>
 <div class="tabpane active" id="nb-m"><div class="card">
-  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div><div><label class="fl2">發布單位</label>${unitSelectHtml('nu',NOTICE_DEPTS,'')}</div></div>
-  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">分類 *</label><select id="ncat"><option value="">請選擇分類</option>${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div></div></div>
+  <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">通告編號</label><input type="text" id="nno" placeholder="例：SOC-1150715-02"></div><div><label class="fl2">發布單位 *</label>${unitSelectHtml('nu',NOTICE_DEPTS,'')}</div></div>
+  <div style="margin-bottom:12px"><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">生效日期 *</label><input type="date" id="nf"></div><div><label class="fl2">到期日期 *</label><input type="date" id="ne"></div></div>
-  <div class="fg2" style="margin-bottom:12px">
-    <div><label class="fl2">是否為展延通告</label><select id="nx"><option value="0">否（首次發布）</option><option value="1">是（展延一次）</option></select></div>
-    <div><label class="fl2">規章修訂狀態</label><select id="nr"><option value="0">未修訂</option><option value="1">已修訂</option></select></div>
-  </div>
+  <div style="margin-bottom:12px"><label class="fl2">是否為展延通告</label><select id="nx"><option value="0">否（首次發布）</option><option value="1">是（展延一次）</option></select></div>
   <div style="margin-bottom:12px"><label class="fl2">通告內容</label><textarea id="nc" placeholder="請輸入通告內容…"></textarea></div>
   <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="nreg" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
   <div style="margin-bottom:12px"><label class="fl2">附件</label>
@@ -1190,11 +1189,11 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
     <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl');autoFillNoticeFromPdf(this)">
     <div class="file-list" id="nfl"></div>
     <div id="notice-extract-status" style="font-size:12px;margin-top:6px;color:var(--ts)"></div></div>
-  <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次；分類會依「發布單位」自動判斷，不需另外選擇；「規章修訂狀態」已改為僅在編輯功能內設定</div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nno','nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="nb-b"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾，系統會逐一擷取通告PDF全文、嘗試辨識標題／分類／生效與到期日期／關聯規章編號，辨識完可逐筆編輯修正，確認後才會送出；PDF檔案將作為該筆通告的附件保存</div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾，系統會逐一解析通告PDF檔名（辨識通告編號、發布單位、生效日期、關聯規章編號），並擷取全文供日後搜尋使用；辨識完可逐筆編輯修正，確認後才會送出；PDF檔案將作為該筆通告的附件保存</div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn btn-primary" onclick="document.getElementById('notice-batch-folder').click()"><i class="ti ti-folder"></i> 選擇資料夾</button>
     <button class="btn" onclick="document.getElementById('notice-batch-files').click()"><i class="ti ti-files"></i> 或選擇多個檔案</button>
@@ -1944,9 +1943,10 @@ async function saveNotice() {
   const title = document.getElementById('nt')?.value?.trim();
   const fromDate = document.getElementById('nf')?.value;
   const toDate = document.getElementById('ne')?.value;
-  const category = document.getElementById('ncat')?.value;
+  const unit = getUnitValue('nu');
+  const category = NOTICE_UNIT_TO_CATEGORY[unit] || '';
   if (!title) { showToast('請輸入通告標題'); return; }
-  if (!category) { showToast('請選擇分類'); return; }
+  if (!unit) { showToast('請選擇發布單位'); return; }
   if (!fromDate || !toDate) { showToast('請輸入生效及到期日期'); return; }
   const btn = document.querySelector('.card .btn-primary');
   setBtnLoading(btn, '發布中…');
@@ -1962,25 +1962,25 @@ async function saveNotice() {
     }
     const newRef = await addDoc(collection(window._db, 'notices'), {
       title, category,
-      unit: getUnitValue('nu'),
+      noticeNo: document.getElementById('nno')?.value?.trim() || '',
+      unit,
       issuedDate: fromDate,
       expiryDate: toDate,
       extended: document.getElementById('nx')?.value === '1',
-      revised: document.getElementById('nr')?.value === '1',
+      revised: false,
       content: document.getElementById('nc')?.value || '',
       linkedRegulation: document.getElementById('nreg')?.value || '',
       attachments, fullText: window._noticeExtractedText || '', status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
-    await logActivity('notice','create',newRef.id,title,'',getUnitValue('nu'));
+    await logActivity('notice','create',newRef.id,title,'',unit);
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
     window._noticeExtractedText = '';
-    ['nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['nno','nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
     const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    const ncatEl = document.getElementById('ncat'); if (ncatEl) ncatEl.value = '';
     const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
     const stEl = document.getElementById('notice-extract-status'); if (stEl) stEl.innerHTML = '';
   } catch(e) {
@@ -2070,20 +2070,21 @@ async function openEdit(kind, docId){
   } else if(kind==='notice'){
     titleEl.textContent='編輯通告';
     html=`
-      <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
-        <div><label class="fl2">分類 *</label><select id="ed-category">${NOTICE_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===d.category?'selected':''}>${c.name}</option>`).join('')}</select></div>
-        <div><label class="fl2">發布單位</label>${unitSelectHtml('ed-unit',NOTICE_DEPTS,d.unit||'')}</div>
+        <div><label class="fl2">通告編號</label><input type="text" id="ed-noticeNo" value="${escapeHtml(d.noticeNo||'')}" placeholder="例：SOC-1150715-02"></div>
+        <div><label class="fl2">發布單位 *</label>${unitSelectHtml('ed-unit',NOTICE_DEPTS,d.unit||'')}</div>
       </div>
+      <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">生效日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
         <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">是否展延</label><select id="ed-extended"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
-        <div><label class="fl2">修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
+        <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
-      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>`;
+      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>
+      <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇</div>`;
   } else if(kind==='regulation'){
     titleEl.textContent='編輯規章資訊';
     html=`
@@ -2141,8 +2142,9 @@ async function saveEdit(){
       localArr=window._dutyDocs; renderFn=renderDutyList;
     } else if(kind==='notice'){
       collectionName='notices';
-      payload.category=document.getElementById('ed-category')?.value||'';
+      payload.noticeNo=document.getElementById('ed-noticeNo')?.value?.trim()||'';
       payload.unit=getUnitValue('ed-unit');
+      payload.category=NOTICE_UNIT_TO_CATEGORY[payload.unit]||'';
       payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
       payload.extended=document.getElementById('ed-extended')?.value==='1';
@@ -2502,40 +2504,43 @@ async function autoFillFormFromPdf(input){
   }
 }
 
+function addMonthsToDate(dateStr, months){
+  if (!dateStr) return '';
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  d.setMonth(d.getMonth()+months);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 async function autoFillNoticeFromPdf(input){
   const file = input.files && input.files[0];
   if (!file) return;
   const st = document.getElementById('notice-extract-status');
+  // 通告一律先用檔名解析（通告編號本身就藏著發布單位與生效日期，比內文可靠，尤其通告多為掃描件）
+  const fnMeta = parseNoticeFilename(file.name);
+  const nnoEl = document.getElementById('nno'); if (nnoEl && !nnoEl.value && fnMeta.noticeNo) nnoEl.value = fnMeta.noticeNo;
+  const nuEl = document.getElementById('nu'); if (nuEl && !nuEl.value && fnMeta.unit) { nuEl.value = fnMeta.unit; toggleOtherUnit('nu'); }
+  const ntEl0 = document.getElementById('nt'); if (ntEl0 && !ntEl0.value && fnMeta.title) ntEl0.value = fnMeta.title;
+  const nfEl0 = document.getElementById('nf'); if (nfEl0 && !nfEl0.value && fnMeta.issuedDate) nfEl0.value = fnMeta.issuedDate;
+  const neEl0 = document.getElementById('ne'); if (neEl0 && !neEl0.value && fnMeta.issuedDate) neEl0.value = addMonthsToDate(fnMeta.issuedDate, 6); // 依公司規則預設到期日=生效日+6個月，可自行調整
+  const nregEl0 = document.getElementById('nreg'); if (nregEl0 && !nregEl0.value && fnMeta.linkedRegulation) nregEl0.value = fnMeta.linkedRegulation;
   if (!isExtractableFile(file.name)) {
-    const ntEl = document.getElementById('nt'); if (ntEl && !ntEl.value) ntEl.value = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
-    if (st) st.innerHTML = '<span style="color:#856404">此檔案格式無法自動擷取全文，已用檔名帶入標題，其餘欄位請手動填寫</span>';
+    if (!ntEl0.value) ntEl0.value = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
+    if (st) st.innerHTML = fnMeta.noticeNo
+      ? '<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（此檔案格式無法擷取全文索引）'
+      : '<span style="color:#856404">此檔案格式無法自動擷取全文，檔名也未能辨識出通告編號，請手動填寫</span>';
     return;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位（若為掃描件將自動改用OCR辨識，速度會較慢）…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 已從檔名帶入欄位，正在擷取全文供日後搜尋用（若為掃描件將自動改用OCR辨識，速度會較慢）…';
   try {
     const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
       if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._noticeExtractedText = text;
-    const norm = normalizeExtractedText(text);
-    const compact = norm.replace(/\s+/g,'');
-    const bm = norm.match(/【([\s\S]+?)】/);
-    let title = bm ? bm[1].replace(/\s+/g,'').trim() : '';
-    if (!title) title = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
-    const fromMatch = norm.match(new RegExp('(?:'+flexLabel('發布日期')+'|'+flexLabel('生效日期')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
-    const toMatch = norm.match(new RegExp('(?:'+flexLabel('到期日期')+'|'+flexLabel('失效日期')+'|'+flexLabel('有效期限至')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
-    const regMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
-    const catGuess = guessNoticeCategory(norm);
-
-    const ntEl = document.getElementById('nt'); if (ntEl && !ntEl.value) ntEl.value = title;
-    const ncatEl = document.getElementById('ncat'); if (ncatEl && !ncatEl.value && catGuess) ncatEl.value = catGuess;
-    const nfEl = document.getElementById('nf'); if (nfEl && !nfEl.value && fromMatch) nfEl.value = parseMinguoDate(fromMatch[1]);
-    const neEl = document.getElementById('ne'); if (neEl && !neEl.value && toMatch) neEl.value = parseMinguoDate(toMatch[1]);
-    const nregEl = document.getElementById('nreg'); if (nregEl && !nregEl.value && regMatch) nregEl.value = regMatch[0].toUpperCase();
-
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤（分類/日期為系統猜測，請務必核對）${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，準確度僅供搜尋參考，欄位請務必人工核對）</span>':''}`;
+    // 內文擷取（尤其OCR結果）不夠可靠，僅用於全文搜尋，不再拿來覆蓋欄位；標題/日期/單位一律以檔名解析為準
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，全文搜尋準確度僅供參考）</span>':''}`;
   } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳）</span>`;
+    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳，欄位已從檔名帶入）</span>`;
   }
 }
 
@@ -2773,34 +2778,28 @@ async function handleNoticeBatchFiles(input){
   const files = Array.from(input.files || []).filter(f => f.name.toLowerCase().endsWith('.pdf'));
   const area = document.getElementById('notice-batch-preview');
   if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到PDF檔案</div>'; return; }
-  area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(0/${files.length})</div>`;
+  area.innerHTML = `<div class="pholder">正在解析檔名並擷取全文…(0/${files.length})</div>`;
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    const fnMeta = parseNoticeFilename(file.name);
     try {
       const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
-        area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
+        area.innerHTML = `<div class="pholder">正在擷取全文中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
       });
-      let title='';
-      const norm = normalizeExtractedText(text);
-      const compact = norm.replace(/\s+/g,'');
-      const bm = norm.match(/【([\s\S]+?)】/);
-      if (bm) title = bm[1].replace(/\s+/g,'').trim();
-      if (!title) title = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
-      const fromMatch = norm.match(new RegExp('(?:'+flexLabel('發布日期')+'|'+flexLabel('生效日期')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
-      const toMatch = norm.match(new RegExp('(?:'+flexLabel('到期日期')+'|'+flexLabel('失效日期')+'|'+flexLabel('有效期限至')+')[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
-      const regMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
       rows.push({
-        file, text, title,
-        category: guessNoticeCategory(norm),
-        issuedDate: fromMatch ? parseMinguoDate(fromMatch[1]) : '',
-        expiryDate: toMatch ? parseMinguoDate(toMatch[1]) : '',
-        linkedRegulation: regMatch ? regMatch[0].toUpperCase() : ''
+        file, text,
+        noticeNo: fnMeta.noticeNo,
+        unit: fnMeta.unit,
+        title: fnMeta.title || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
+        issuedDate: fnMeta.issuedDate,
+        expiryDate: fnMeta.issuedDate ? addMonthsToDate(fnMeta.issuedDate, 6) : '',
+        linkedRegulation: fnMeta.linkedRegulation
       });
     } catch(e) {
-      rows.push({file, text:'', title:file.name.replace(/\.[a-zA-Z0-9]+$/,''), category:'', issuedDate:'', expiryDate:'', linkedRegulation:'', _extractError:e.message});
+      rows.push({file, text:'', noticeNo:fnMeta.noticeNo, unit:fnMeta.unit, title:fnMeta.title||file.name.replace(/\.[a-zA-Z0-9]+$/,''), issuedDate:fnMeta.issuedDate, expiryDate:fnMeta.issuedDate?addMonthsToDate(fnMeta.issuedDate,6):'', linkedRegulation:fnMeta.linkedRegulation, _extractError:e.message});
     }
-    area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(${i+1}/${files.length})</div>`;
+    area.innerHTML = `<div class="pholder">正在解析中…(${i+1}/${files.length})</div>`;
   }
   window._noticeBatchRows = rows;
   renderNoticeBatchPreview();
@@ -2811,20 +2810,21 @@ function renderNoticeBatchPreview(){
   const area = document.getElementById('notice-batch-preview');
   if (!area) return;
   if (rows.length === 0) { area.innerHTML = ''; return; }
-  const catOpts = sel => '<option value="">請選擇</option>' + NOTICE_CATEGORIES.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${c.name}</option>`).join('');
+  const unitOpts = sel => '<option value="">請選擇</option>' + NOTICE_DEPTS.map(u=>`<option value="${u}" ${u===sel?'selected':''}>${u}</option>`).join('');
   const rowsHtml = rows.map((r,i)=>`<tr>
-    <td>${escapeHtml(r.file.name)}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗</div>`:''}</td>
-    <td><select id="ntcb-cat-${i}" style="min-width:160px" onchange="window._noticeBatchRows[${i}].category=this.value">${catOpts(r.category)}</select></td>
-    <td><input type="text" id="ntcb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:160px" oninput="window._noticeBatchRows[${i}].title=this.value"></td>
+    <td>${escapeHtml(r.file.name)}${r._extractError?`<div style="color:#E24B4A;font-size:11px">全文擷取失敗（不影響欄位辨識與上傳）</div>`:''}${!r.noticeNo?`<div style="color:#856404;font-size:11px">檔名未辨識到通告編號，請人工確認</div>`:''}</td>
+    <td><input type="text" id="ntcb-no-${i}" value="${escapeHtml(r.noticeNo)}" style="min-width:130px" oninput="window._noticeBatchRows[${i}].noticeNo=this.value"></td>
+    <td><select id="ntcb-unit-${i}" style="min-width:110px" onchange="window._noticeBatchRows[${i}].unit=this.value">${unitOpts(r.unit)}</select></td>
+    <td><input type="text" id="ntcb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:180px" oninput="window._noticeBatchRows[${i}].title=this.value"></td>
     <td><input type="date" id="ntcb-from-${i}" value="${r.issuedDate||''}" oninput="window._noticeBatchRows[${i}].issuedDate=this.value"></td>
     <td><input type="date" id="ntcb-to-${i}" value="${r.expiryDate||''}" oninput="window._noticeBatchRows[${i}].expiryDate=this.value"></td>
     <td><input type="text" id="ntcb-reg-${i}" value="${escapeHtml(r.linkedRegulation)}" style="min-width:150px" oninput="window._noticeBatchRows[${i}].linkedRegulation=this.value"></td>
   </tr>`).join('');
   area.innerHTML = `
-    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，請逐筆檢查／修改辨識結果（尤其是分類與日期），確認無誤後按下方按鈕送出</div>
+    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，欄位依檔名解析（通告編號本身就藏著發布單位與生效日期），到期日期預設為生效日期+6個月，請逐筆檢查／修改後確認送出；分類會依發布單位自動判斷</div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px">
       <table class="vtbl">
-        <thead><tr><th>檔名</th><th>分類</th><th>通告標題</th><th>生效日期</th><th>到期日期</th><th>關聯規章</th></tr></thead>
+        <thead><tr><th>檔名</th><th>通告編號</th><th>發布單位</th><th>通告標題</th><th>生效日期</th><th>到期日期</th><th>關聯規章</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
@@ -2847,8 +2847,9 @@ async function confirmNoticeBatchUpload(){
         if (!r.title) throw new Error('缺通告標題');
         const fileUrl = await uploadFile(r.file, `notices/${new Date().getFullYear()}/${Date.now()}_${r.file.name}`);
         await addDoc(collection(window._db, 'notices'), {
-          title: r.title, category: r.category || '',
-          unit: '', issuedDate: r.issuedDate || null, expiryDate: r.expiryDate || null,
+          title: r.title, category: NOTICE_UNIT_TO_CATEGORY[r.unit] || '',
+          noticeNo: r.noticeNo || '', unit: r.unit || '',
+          issuedDate: r.issuedDate || null, expiryDate: r.expiryDate || null,
           extended: false, revised: false,
           content: '', linkedRegulation: r.linkedRegulation || '',
           attachments: [{name: r.file.name, url: fileUrl, size: r.file.size}],
@@ -2862,7 +2863,7 @@ async function confirmNoticeBatchUpload(){
     setBtnSuccess(btn, '已完成');
     if(ok>0) await logActivity('notice','batch_create','',`批次上傳 ${ok} 份通告`);
     showToast(`已上傳 ${ok} 份通告${fail?`，${fail} 份失敗`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}；缺分類或日期的通告會出現在「缺到期日」分頁，請記得補登</div>`;
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}；缺發布單位或日期的通告會出現在「缺到期日」分頁，請記得補登</div>`;
     window._noticeBatchRows = [];
   } catch(e) {
     setBtnError(btn);
@@ -3039,6 +3040,31 @@ function parseMinguoDate(s){
   let y=parseInt(m[1]),mo=m[2].padStart(2,'0'),d=m[3].padStart(2,'0');
   if(y<1000) y+=1911;
   return `${y}-${mo}-${d}`;
+}
+function parseCompactMinguoDate(s){
+  // 通告編號中常見的民國年月日純數字格式，如 1150122 = 民國115年01月22日
+  if(!s || !/^\d{6,7}$/.test(s)) return '';
+  const s7 = s.length===6 ? '0'+s : s; // 補齊為7碼（年份不足3碼時前補0）
+  return parseMinguoDate(`${s7.slice(0,3)}/${s7.slice(3,5)}/${s7.slice(5,7)}`);
+}
+const NOTICE_UNIT_CODE_MAP={'SOC':'站務中心','OCC':'行控中心','TKC':'票務中心','OPD':'運務處','MAD':'維修處','ISD':'工安處'};
+function parseNoticeFilename(fileName){
+  const base = (fileName||'').replace(/\.[a-zA-Z0-9]+$/, '');
+  let noticeNo='', unit='', issuedDate='';
+  const noMatch = base.match(/([A-Za-z]{2,4})-(\d{6,7})-(\d{2,3})/);
+  if (noMatch) {
+    noticeNo = noMatch[0].toUpperCase();
+    unit = NOTICE_UNIT_CODE_MAP[noMatch[1].toUpperCase()] || '';
+    issuedDate = parseCompactMinguoDate(noMatch[2]);
+  }
+  const regMatch = base.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+  const linkedRegulation = regMatch ? regMatch[0].toUpperCase() : '';
+  let rest = base;
+  if (noMatch) rest = rest.replace(noMatch[0], '');
+  if (regMatch) rest = rest.replace(regMatch[0], '');
+  rest = rest.replace(/^[\s_]*[運行站票維工][務控務務修安][處中心處廠處][^_]{0,4}通告/, ''); // 去掉開頭「XX中心通告」這類前綴（若有）
+  const title = rest.replace(/[_]+/g, ' ').replace(/^[\s_（(]+|[\s_）)]+$/g, '').trim();
+  return {noticeNo, unit, issuedDate, linkedRegulation, title};
 }
 
 // ===== Word/Excel 全文擷取 =====
