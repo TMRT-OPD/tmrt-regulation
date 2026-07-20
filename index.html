@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 37</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 38</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2447,9 +2447,9 @@ async function autoFillRegFromPdf(input){
     const rv = document.getElementById('rv'); if (rv && !rv.value && fnMeta.version) rv.value = fnMeta.version;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && fnMeta.dept) rdept.value = fnMeta.dept;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位（若為掃描件將自動改用OCR辨識，速度會較慢）…';
   try {
-    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+    const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
       if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._regExtractedText = text;
@@ -2460,7 +2460,7 @@ async function autoFillRegFromPdf(input){
     const rdate = document.getElementById('rdate'); if (rdate && !rdate.value && meta.approvedDate) rdate.value = meta.approvedDate;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && meta.dept) rdept.value = meta.dept;
     const finalDocNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到文件編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到文件編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，準確度僅供搜尋參考，欄位請務必人工核對）</span>':''}`;
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳${fnMeta?'，已從檔名帶入部分欄位':''}）</span>`;
   }
@@ -2483,9 +2483,9 @@ async function autoFillFormFromPdf(input){
       : '<span style="color:#856404">檔名未包含可辨識的文件編號格式，請手動輸入（此檔案格式無法擷取全文）</span>';
     return;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位（若為掃描件將自動改用OCR辨識，速度會較慢）…';
   try {
-    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+    const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
       if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._formExtractedText = text;
@@ -2496,7 +2496,7 @@ async function autoFillFormFromPdf(input){
     const fdate = document.getElementById('fdate'); if (fdate && !fdate.value && meta.approvedDate) fdate.value = meta.approvedDate;
     const fdept = document.getElementById('fdept'); if (fdept && !fdept.value && meta.dept) fdept.value = meta.dept;
     const finalDocNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到表單編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到表單編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，準確度僅供搜尋參考，欄位請務必人工核對）</span>':''}`;
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳${fnMeta?'，已從檔名帶入部分欄位':''}）</span>`;
   }
@@ -2511,9 +2511,9 @@ async function autoFillNoticeFromPdf(input){
     if (st) st.innerHTML = '<span style="color:#856404">此檔案格式無法自動擷取全文，已用檔名帶入標題，其餘欄位請手動填寫</span>';
     return;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位…';
+  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位（若為掃描件將自動改用OCR辨識，速度會較慢）…';
   try {
-    const {text, truncated} = await extractFileText(file, 500, (i,n,total)=>{
+    const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
       if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
     });
     window._noticeExtractedText = text;
@@ -2533,7 +2533,7 @@ async function autoFillNoticeFromPdf(input){
     const neEl = document.getElementById('ne'); if (neEl && !neEl.value && toMatch) neEl.value = parseMinguoDate(toMatch[1]);
     const nregEl = document.getElementById('nreg'); if (nregEl && !nregEl.value && regMatch) nregEl.value = regMatch[0].toUpperCase();
 
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤（分類/日期為系統猜測，請務必核對）${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}`;
+    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已擷取全文並自動帶入可辨識欄位，請確認內容無誤（分類/日期為系統猜測，請務必核對）${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，準確度僅供搜尋參考，欄位請務必人工核對）</span>':''}`;
   } catch(e) {
     if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳）</span>`;
   }
@@ -3127,6 +3127,42 @@ function ensurePdfJs(){
   return _pdfJsLoadingPromise;
 }
 
+let _tesseractLoadingPromise=null;
+function ensureTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(_tesseractLoadingPromise) return _tesseractLoadingPromise;
+  _tesseractLoadingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=()=>resolve(window.Tesseract);
+    s.onerror=()=>reject(new Error('OCR 辨識套件載入失敗，請檢查網路連線'));
+    document.head.appendChild(s);
+  });
+  return _tesseractLoadingPromise;
+}
+async function ocrPdfPages(pdf, maxPages, onProgress){
+  const Tesseract = await ensureTesseract();
+  const worker = await Tesseract.createWorker(['chi_tra','eng']);
+  let text='';
+  const n = Math.min(pdf.numPages, maxPages);
+  try{
+    for(let i=1;i<=n;i++){
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({scale: 2}); // 提高解析度以增加辨識準確度
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({canvasContext: ctx, viewport}).promise;
+      const { data } = await worker.recognize(canvas);
+      text += (data.text||'') + '\n';
+      if(onProgress) onProgress(i, n, pdf.numPages);
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return text;
+}
+
 async function extractPdfText(file, maxPages, onProgress){
   maxPages = maxPages || 500; // 實務上規章不太可能超過500頁，此上限僅為防呆，避免極端異常檔案卡死瀏覽器
   const pdfjsLib = await ensurePdfJs();
@@ -3175,7 +3211,21 @@ async function extractPdfText(file, maxPages, onProgress){
   }
   // 濾除頁碼：整行只有1~4個數字、沒有其他文字的行，幾乎必定是頁尾頁碼而非真實內容
   text = text.split('\n').filter(line => !/^\s*\d{1,4}\s*$/.test(line)).join('\n');
-  return {text, numPages: pdf.numPages, extractedPages: n, truncated: pdf.numPages > maxPages};
+  // 若一般文字擷取結果過於稀疏（平均每頁不到15個字），很可能是掃描件／照片型PDF，自動改用OCR辨識
+  let usedOCR = false;
+  const avgCharsPerPage = n>0 ? text.replace(/\s/g,'').length / n : 0;
+  if (avgCharsPerPage < 15) {
+    try{
+      const ocrText = await ocrPdfPages(pdf, maxPages, onProgress);
+      if (ocrText.replace(/\s/g,'').length > text.replace(/\s/g,'').length) {
+        text = ocrText;
+        usedOCR = true;
+      }
+    }catch(ocrErr){
+      console.warn('OCR 辨識失敗，改用原始（可能為空）擷取結果：', ocrErr);
+    }
+  }
+  return {text, numPages: pdf.numPages, extractedPages: n, truncated: pdf.numPages > maxPages, usedOCR};
 }
 
 // ===== 處室樹狀結構展平，供下拉選單與自動比對使用 =====
