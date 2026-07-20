@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 41</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 42</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1185,7 +1185,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div style="margin-bottom:12px"><label class="fl2">通告內容</label><textarea id="nc" placeholder="請輸入通告內容…"></textarea></div>
   <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="nreg" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
   <div style="margin-bottom:12px"><label class="fl2">附件</label>
-    <div id="notice-drop-zone" class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處</span></div>
+    <div id="notice-drop-zone" class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處（可一次選多個檔案，例如同時上傳Word文字版＋簽核用PDF）</span></div>
     <input type="file" id="nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'nfl');autoFillNoticeFromPdf(this)">
     <div class="file-list" id="nfl"></div>
     <div id="notice-extract-status" style="font-size:12px;margin-top:6px;color:var(--ts)"></div></div>
@@ -2561,35 +2561,49 @@ function addMonthsToDate(dateStr, months){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 async function autoFillNoticeFromPdf(input){
-  const file = input.files && input.files[0];
-  if (!file) return;
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
   const st = document.getElementById('notice-extract-status');
-  // 通告一律先用檔名解析（通告編號本身就藏著發布單位與生效日期，比內文可靠，尤其通告多為掃描件）
-  const fnMeta = parseNoticeFilename(file.name);
+  // 欄位一律用檔名解析（通告編號本身就藏著發布單位與生效日期，比內文可靠，尤其通告多為掃描件）；多檔案時，取第一個能辨識出通告編號的檔名為準
+  let fnMeta = parseNoticeFilename(files[0].name);
+  if (!fnMeta.noticeNo) {
+    const better = files.map(f=>parseNoticeFilename(f.name)).find(m=>m.noticeNo);
+    if (better) fnMeta = better;
+  }
   const nnoEl = document.getElementById('nno'); if (nnoEl && !nnoEl.value && fnMeta.noticeNo) nnoEl.value = fnMeta.noticeNo;
   const nuEl = document.getElementById('nu'); if (nuEl && !nuEl.value && fnMeta.unit) { nuEl.value = fnMeta.unit; toggleOtherUnit('nu'); }
   const ntEl0 = document.getElementById('nt'); if (ntEl0 && !ntEl0.value && fnMeta.title) ntEl0.value = fnMeta.title;
   const nfEl0 = document.getElementById('nf'); if (nfEl0 && !nfEl0.value && fnMeta.issuedDate) nfEl0.value = fnMeta.issuedDate;
   const neEl0 = document.getElementById('ne'); if (neEl0 && !neEl0.value && fnMeta.issuedDate) neEl0.value = addMonthsToDate(fnMeta.issuedDate, 6); // 依公司規則預設到期日=生效日+6個月，可自行調整
   const nregEl0 = document.getElementById('nreg'); if (nregEl0 && !nregEl0.value && fnMeta.linkedRegulation) nregEl0.value = fnMeta.linkedRegulation;
-  if (!isExtractableFile(file.name)) {
-    if (!ntEl0.value) ntEl0.value = file.name.replace(/\.[a-zA-Z0-9]+$/,'');
+  if (!ntEl0.value) ntEl0.value = files[0].name.replace(/\.[a-zA-Z0-9]+$/,'');
+
+  const extractableFiles = files.filter(f => isExtractableFile(f.name));
+  if (extractableFiles.length === 0) {
     if (st) st.innerHTML = fnMeta.noticeNo
-      ? '<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（此檔案格式無法擷取全文索引）'
-      : '<span style="color:#856404">此檔案格式無法自動擷取全文，檔名也未能辨識出通告編號，請手動填寫</span>';
+      ? `<i class="ti ti-check" style="color:#27500A"></i> 已從檔名自動帶入欄位，請確認內容無誤（${files.length>1?'所選檔案':'此檔案'}格式皆無法擷取全文索引）`
+      : '<span style="color:#856404">所選檔案格式無法自動擷取全文，檔名也未能辨識出通告編號，請手動填寫</span>';
     return;
   }
-  if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 已從檔名帶入欄位，正在擷取全文供日後搜尋用（若為掃描件將自動改用OCR辨識，速度會較慢）…';
-  try {
-    const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
-      if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
-    });
-    window._noticeExtractedText = text;
-    // 內文擷取（尤其OCR結果）不夠可靠，僅用於全文搜尋，不再拿來覆蓋欄位；標題/日期/單位一律以檔名解析為準
-    if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，全文搜尋準確度僅供參考）</span>':''}`;
-  } catch(e) {
-    if (st) st.innerHTML = `<span style="color:#E24B4A">全文擷取失敗：${e.message}（不影響上傳，欄位已從檔名帶入）</span>`;
+  if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 已從檔名帶入欄位，正在擷取全文供日後搜尋用（共 ${extractableFiles.length} 個檔案可擷取；若為掃描件將自動改用OCR辨識，速度會較慢）…`;
+  let combinedText = '';
+  let anyOCR = false, anyTruncated = false, failCount = 0;
+  for (const file of extractableFiles) {
+    try {
+      const {text, truncated, usedOCR} = await extractFileText(file, 500, (i,n,total)=>{
+        if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取「${escapeHtml(file.name)}」…(${i}/${n}頁${total>n?`，共${total}頁`:''})`;
+      });
+      if (text && text.trim()) combinedText += (combinedText?'\n\n':'') + `【來源檔案：${file.name}】\n` + text;
+      if (usedOCR) anyOCR = true;
+      if (truncated) anyTruncated = true;
+    } catch(e) {
+      failCount++;
+      console.warn(`擷取「${file.name}」失敗：`, e);
+    }
   }
+  window._noticeExtractedText = combinedText;
+  // 內文擷取（尤其OCR結果）不夠可靠，僅用於全文搜尋，不再拿來覆蓋欄位；標題/日期/單位一律以檔名解析為準
+  if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位並':''}擷取 ${extractableFiles.length-failCount}/${extractableFiles.length} 個檔案的全文供日後搜尋${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${anyOCR?'　<span style="color:#856404">（部分文件為掃描件，已自動使用OCR辨識，準確度僅供參考）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
 }
 
 // ===== 批次上傳：規章 =====
