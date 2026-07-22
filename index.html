@@ -57,6 +57,7 @@ body{font-family:var(--fs);background:var(--ct);display:flex;min-height:100vh;co
 .tag{font-size:11px;padding:2px 7px;border-radius:var(--rm);border:0.5px solid;white-space:nowrap;display:inline-block}
 .tag-revised{background:#EAF3DE;color:#27500A;border-color:#C0DD97}
 .tag-unrevised{background:#FCEBEB;color:#791F1F;border-color:#F09595}
+.tag-extended{background:#FDF0DC;color:#8A5A00;border-color:#F0C97A}
 .badge{font-size:11px;padding:2px 7px;border-radius:var(--rm);font-weight:500;display:inline-block;white-space:nowrap}
 .lv-s{background:#EEEDFE;color:#3C3489}.lv-a{background:#e6f1fb;color:#0c447c}.lv-b{background:var(--cs);color:var(--ts)}
 .sb{display:flex;align-items:center;gap:8px;background:var(--cp);border:0.5px solid var(--bs);border-radius:var(--rm);padding:7px 12px;margin-bottom:14px}
@@ -230,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 48</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 49</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -908,11 +909,11 @@ function renderNoticeList(){
     return `<div class="list-card ${expired?'expired':''}" style="${expired?'':`border-left-color:${missingExpiry?'#e0a72e':(cat?cat.text:'#9e9e9a')}`}">
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
         ${catBadge(cat)}${expired?expiredBadge():''}${missingExpiry?missingExpiryBadge():''}
-        ${d.extended?'<span class="tag tag-unrevised" style="border-radius:14px">展延</span>':''}
+        ${d.extended?'<span class="tag tag-extended" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}${d.noticeNo?` <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(d.noticeNo)}）</span>`:''}</div>
-      <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}</div>
+      <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<span style="text-decoration:line-through;color:var(--tt)">${d.originalExpiryDate}</span> → <b style="color:#8A5A00">${d.expiryDate||'—'}</b>`:(d.expiryDate||'—')}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}${d.relatedNotices?'　關聯通告：'+escapeHtml(d.relatedNotices):''}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
       ${d.attachments&&d.attachments.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${d.attachments.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:''}
       ${lastUpdatedLine(d)}
@@ -2114,20 +2115,21 @@ async function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">標題 *</label><input type="text" id="ed-title" value="${escapeHtml(d.title||'')}"></div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">生效日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
-        <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
+        <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}">${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<div style="font-size:11px;color:var(--ts);margin-top:3px">原到期日：${d.originalExpiryDate}</div>`:''}</div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
         <div><label class="fl2">是否展延</label><select id="ed-extended"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
         <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
       <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>
+      <div style="margin-bottom:12px"><label class="fl2">關聯通告編號（選填，多筆可用頓號或逗號分隔）</label><input type="text" id="ed-relatedNotices" value="${escapeHtml(d.relatedNotices||'')}" placeholder="例：SOC-1140910-01、SOC-1140911-01"></div>
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
         <div style="margin-top:8px"><label class="btn btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> 新增／替換附件<input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list')"></label></div>
         <div class="file-list" id="ed-nfs-list" style="margin-top:6px"></div>
         <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若要整份取代舊附件，先移除舊附件再新增</div>
       </div>
-      <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇</div>`;
+      <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇；若此通告是為了展延其他通告的效期，請直接編輯「被展延的原始通告」本身，將其到期日期改為展延後的新日期並將「是否展延」設為是，系統才會正確判斷效期，本則展延公告可用「關聯通告編號」註記關聯</div>`;
   } else if(kind==='regulation'){
     titleEl.textContent='編輯規章資訊';
     html=`
@@ -2206,6 +2208,16 @@ async function saveEdit(){
       payload.extended=document.getElementById('ed-extended')?.value==='1';
       payload.revised=document.getElementById('ed-revised')?.value==='1';
       payload.content=document.getElementById('ed-content')?.value||'';
+      payload.relatedNotices=document.getElementById('ed-relatedNotices')?.value?.trim()||'';
+      // 展延時自動記錄「第一次展延前」的原到期日，供清單對照顯示；若已有原到期日紀錄則保留，不會被後續展延覆蓋掉
+      const existingNoticeData = (window._noticeDocs||[]).find(x=>x.id===docId);
+      if (existingNoticeData) {
+        if (payload.extended && payload.expiryDate !== existingNoticeData.expiryDate) {
+          payload.originalExpiryDate = existingNoticeData.originalExpiryDate || existingNoticeData.expiryDate || null;
+        } else if (existingNoticeData.originalExpiryDate) {
+          payload.originalExpiryDate = existingNoticeData.originalExpiryDate;
+        }
+      }
       const attachments = [...(window._editNoticeAttachments||[])];
       const newFileInput = document.getElementById('ed-nfs');
       let appendedText = '';
