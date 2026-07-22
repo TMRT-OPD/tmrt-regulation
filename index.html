@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 50</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 51</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -712,6 +712,9 @@ function catBadge(cat){return cat?`<span class="cat-badge" style="background:${c
 function expiredBadge(){return '<span class="cat-badge" style="background:#e9ecef;color:#495057">已逾期</span>';}
 function missingExpiryBadge(){return '<span class="cat-badge" style="background:#faeeda;color:#633806">⚠ 缺到期日，待確認</span>';}
 
+function toggleNoticeExtendedFilter(){
+  renderNoticeList();
+}
 function renderFilterUI(kind,categories){
   const opts=categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   const chips=categories.map(c=>`<div class="chip" data-cat="${c.id}" style="background:${c.bg};color:${c.text}" onclick="toggleCatChip('${kind}','${c.id}')">${c.name}</div>`).join('');
@@ -738,10 +741,8 @@ function pageDuty(){
 }
 
 function pageNotice(){
-  const c=window._level==='S'||window._level==='A';
   window._noticeState=window._noticeState||{tab:'active',category:''};
   return `<div class="ptitle">通告</div><div class="psub">含展延通告（另行標記）；標示已修訂／未修訂狀態　<span id="notice-last-updated" style="color:var(--tt)"></span></div>
-  ${c?'<button class="btn btn-primary" style="margin-bottom:14px" onclick="gp(\'admin-upload-notice\',null)"><i class="ti ti-plus"></i> 新增通告</button>':''}
   <div class="tabs" id="notice-tabs">
     <div class="tab ${window._noticeState.tab==='active'?'active':''}" data-tab="active" onclick="switchListTab('notice','active')">效期內</div>
     <div class="tab ${window._noticeState.tab==='expired'?'active':''}" data-tab="expired" onclick="switchListTab('notice','expired')">逾期</div>
@@ -749,6 +750,7 @@ function pageNotice(){
     <div class="tab ${window._noticeState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('notice','all')">全部</div>
   </div>
   <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告（可用空白分隔多個關鍵字）" oninput="renderNoticeList()"></div>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:10px;cursor:pointer;width:fit-content"><input type="checkbox" id="notice-extended-only" onchange="toggleNoticeExtendedFilter()"> 只看展延通告</label>
   ${renderFilterUI('notice',NOTICE_CATEGORIES)}
   <div id="notice-list-area"><div class="pholder">載入中…</div></div>`;
 }
@@ -883,6 +885,7 @@ function renderNoticeList(){
   const st=window._noticeState||{tab:'active',category:''};
   const today=new Date().toISOString().slice(0,10);
   const kw=(document.getElementById('notice-search')?.value||'').trim().toLowerCase();
+  const extendedOnly=document.getElementById('notice-extended-only')?.checked;
   let list=window._noticeDocs.filter(d=>{
     const missingExpiry=!isValidDate(d.expiryDate);
     const expired=!missingExpiry&&d.expiryDate<today;
@@ -891,6 +894,7 @@ function renderNoticeList(){
     if(st.tab==='missing'&&!missingExpiry)return false;
     if(st.tab==='all'&&missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
+    if(extendedOnly&&!d.extended)return false;
     if(!matchesAllKeywords([d.title,d.content],kw))return false;
     return true;
   });
