@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 49</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 50</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2118,7 +2118,7 @@ async function openEdit(kind, docId){
         <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}">${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<div style="font-size:11px;color:var(--ts);margin-top:3px">原到期日：${d.originalExpiryDate}</div>`:''}</div>
       </div>
       <div class="fg2" style="margin-bottom:12px">
-        <div><label class="fl2">是否展延</label><select id="ed-extended"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
+        <div><label class="fl2">是否展延</label><select id="ed-extended" onchange="autoExtendNoticeExpiry(this)"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
         <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
       <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>
@@ -2129,7 +2129,7 @@ async function openEdit(kind, docId){
         <div class="file-list" id="ed-nfs-list" style="margin-top:6px"></div>
         <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若要整份取代舊附件，先移除舊附件再新增</div>
       </div>
-      <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇；若此通告是為了展延其他通告的效期，請直接編輯「被展延的原始通告」本身，將其到期日期改為展延後的新日期並將「是否展延」設為是，系統才會正確判斷效期，本則展延公告可用「關聯通告編號」註記關聯</div>`;
+      <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇；若此通告是為了展延其他通告的效期，請直接編輯「被展延的原始通告」本身——把「是否展延」切為是，到期日期會自動延後6個月（可再自行調整），系統才會正確判斷效期；本則展延公告可用「關聯通告編號」註記關聯</div>`;
   } else if(kind==='regulation'){
     titleEl.textContent='編輯規章資訊';
     html=`
@@ -2157,6 +2157,16 @@ async function openEdit(kind, docId){
   document.getElementById('modal-edit').classList.add('open');
 }
 
+function autoExtendNoticeExpiry(selectEl){
+  if (selectEl.value !== '1') return; // 切回「否」不做任何事，保留使用者手動填的日期
+  const expEl = document.getElementById('ed-expiryDate');
+  if (!expEl || !expEl.value) { showToast('請先確認目前的到期日期欄位有值，再切換展延'); return; }
+  const newDate = addMonthsToDate(expEl.value, 6); // 依公司規則管理辦法，展延以6個月為限
+  if (newDate) {
+    expEl.value = newDate;
+    showToast('已自動將到期日期延後6個月，可自行調整');
+  }
+}
 function removeEditNoticeAttachment(url){
   if (!window._editNoticeAttachments) return;
   const idx = window._editNoticeAttachments.findIndex(a => a.url === url);
