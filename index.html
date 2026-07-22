@@ -230,7 +230,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 46</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 47</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2707,7 +2707,9 @@ async function confirmRegBatchUpload(){
         if (!r.title) throw new Error('缺文件名稱');
         const ver = r.version || '1';
         const existing = await findActiveDoc('regulations', 'docNo', r.docNo, r.title);
-        if (existing && String(existing.data.version||'') === String(ver)) { skippedDup++; }
+        const existingHasText = existing && existing.data.fullText && existing.data.fullText.trim();
+        const newHasText = r.text && r.text.trim();
+        if (existing && String(existing.data.version||'') === String(ver) && (existingHasText || !newHasText)) { skippedDup++; }
         else {
           const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
           const docRef = await addDoc(collection(window._db, 'regulations'), {
@@ -2817,7 +2819,9 @@ async function confirmFormBatchUpload(){
       try {
         if (!r.title) throw new Error('缺表單名稱');
         const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo, r.title) : null;
-        if (existing && r.version && String(existing.data.version||'') === String(r.version)) { skippedDup++; }
+        const existingHasText = existing && existing.data.fullText && existing.data.fullText.trim();
+        const newHasText = r.text && r.text.trim();
+        if (existing && r.version && String(existing.data.version||'') === String(r.version) && (existingHasText || !newHasText)) { skippedDup++; }
         else {
           const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
           const docRef = await addDoc(collection(window._db, 'forms'), {
