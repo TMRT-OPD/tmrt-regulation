@@ -247,7 +247,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 58</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 59</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2400,9 +2400,11 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
     const all = [];
     snap.forEach(d => all.push({id: d.id, ...d.data()}));
     // 用 supersedeDoc 寫入的 supersededBy 追出真正的取代鏈，而非比對名稱——
-    // 名稱在展延/改版時可能變動（例如上次的行控中心工作說明書案例），用實際取代關係才能正確辨識「這是不是同一份文件的前一版」，
-    // 同時也能正確排除「同編號但其實是刻意拆分的獨立文件」（因為它們之間從未有 supersede 關係）
-    const active = all.find(d => d.status === 'active');
+    // 名稱在展延/改版時可能變動（例如行控中心工作說明書案例），用實際取代關係才能正確辨識「這是不是同一份文件的前一版」
+    const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
+    const actives = all.filter(d => d.status === 'active');
+    // 若同編號下同時有多筆現行有效文件（拆分情境，例如同編號但已分成多份獨立文件），優先挑名稱與目前點擊那筆一致的作為追溯起點
+    const active = actives.find(d => normTitle(d.title) === normTitle(displayTitle)) || actives[0];
     let list;
     if (active) {
       list = [active];
@@ -2417,6 +2419,7 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
       list = all; // 找不到現行有效版本（罕見狀況，例如已被刪除），退回顯示全部避免完全空白查不到任何資料
     }
     if (list.length === 0) { body.innerHTML = '<div class="pholder">查無資料</div>'; return; }
+    window._historyContext = {collectionName, field, value, displayTitle};
     list.sort((a,b) => {
       const va = parseFloat(a.version) || 0, vb = parseFloat(b.version) || 0;
       if (vb !== va) return vb - va;
@@ -2433,11 +2436,32 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, ${JSON.stringify(collectionName)}, ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
           ${(d.fileUrl&&(window._level==='S'||window._level==='A'))?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
+          ${(!isActive&&window._level==='S')?`<button class="btn btn-sm" style="color:#8A5A00" onclick='restoreSupersededVersion(${JSON.stringify(collectionName)},${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-arrow-back-up"></i> 恢復為有效版本</button>`:''}
         </div>
       </div>`;
     }).join('');
   } catch(e) {
     if (body) body.innerHTML = `<div class="pholder">載入失敗：${e.message}</div>`;
+  }
+}
+
+async function restoreSupersededVersion(collectionName, docId, title){
+  const ctx = window._historyContext;
+  const currentActiveTitle = ctx ? ctx.displayTitle : '';
+  if (!confirm(`確定要把「${title||'此版本'}」恢復為有效版本嗎？\n\n恢復後，這筆會重新出現在瀏覽清單上；如果它跟目前的現行版本「${currentActiveTitle}」其實是同編號但各自獨立的不同文件（例如整份文件被拆分成多份），兩者會同時存在、不會互相取代，之後可能需要到「資料完整性檢查」把這組標記為刻意拆分。`)) return;
+  try {
+    const {doc, updateDoc, deleteField, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await updateDoc(doc(window._db, collectionName, docId), {
+      status: 'active', supersededBy: deleteField(), supersededAt: deleteField(),
+      restoredAt: serverTimestamp(), restoredBy: window._uid||''
+    });
+    await logActivity(collectionName==='regulations'?'regulation':'form', 'update', docId, title, '從已下架版本恢復為有效版本');
+    showToast('已恢復為有效版本');
+    if (ctx) showVersionHistory(ctx.collectionName, ctx.field, ctx.value, ctx.displayTitle);
+    if (collectionName==='regulations' && typeof renderRegList==='function' && document.getElementById('reg-list-area')) loadRegList((window._regListDocs||[]).map(d=>d.dept).filter((v,i,a)=>a.indexOf(v)===i), window._regListRequireSearch);
+    if (collectionName==='forms' && typeof renderFormList==='function' && document.getElementById('form-list-area')) loadFormList((window._formListDocs||[]).map(d=>d.dept).filter((v,i,a)=>a.indexOf(v)===i), window._formListRequireSearch);
+  } catch(e) {
+    showToast('恢復失敗：'+e.message);
   }
 }
 
