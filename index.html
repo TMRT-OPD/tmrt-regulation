@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 51</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 52</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2054,6 +2054,17 @@ async function findActiveDoc(collectionName, field, value, title){
   }
   return null;
 }
+async function findActiveDocSilent(collectionName, field, value){
+  // 批次掃描專用：只比對編號，不彈confirm視窗（名稱是否相符交由畫面上的狀態欄位呈現，讓使用者自己勾選決定）
+  if (!value) return null;
+  const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  const q = query(collection(window._db, collectionName), where(field,'==',value), where('status','==','active'));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  let result = null;
+  snap.forEach(d => { result = {id: d.id, data: d.data()}; });
+  return result;
+}
 async function supersedeDoc(collectionName, docId, newDocId){
   const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
   await updateDoc(doc(window._db, collectionName, docId), {
@@ -2665,16 +2676,18 @@ async function handleRegBatchFiles(input){
   const area = document.getElementById('reg-batch-preview');
   if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到PDF檔案</div>'; return; }
   area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(0/${files.length})</div>`;
+  const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const fnMeta = extractMetaFromFilename(file.name);
+    let row;
     try {
       const {text} = await extractPdfText(file, 500, (pi,pn,ptotal)=>{
         area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
       });
       const meta = extractDocMetaFromText(text, file.name);
-      rows.push({
+      row = {
         file, text,
         docNo: (fnMeta&&fnMeta.docNo) || meta.docNo,
         title: (fnMeta&&fnMeta.title) || meta.title,
@@ -2682,22 +2695,46 @@ async function handleRegBatchFiles(input){
         version: (fnMeta&&fnMeta.version) || meta.version || '',
         approvedDate: meta.approvedDate,
         tier: '2'
-      });
+      };
     } catch(e) {
-      rows.push({
+      row = {
         file, text: '',
         docNo: (fnMeta&&fnMeta.docNo) || '',
         title: (fnMeta&&fnMeta.title) || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
         dept: (fnMeta&&fnMeta.dept) || '',
         version: (fnMeta&&fnMeta.version) || '',
         approvedDate: '', tier: '2', _extractError: e.message
-      });
+      };
     }
+    // 掃描階段同時判斷狀態，供畫面列出讓使用者逐筆確認，不在此階段寫入資料庫
+    const existing = row.docNo ? await findActiveDocSilent('regulations', 'docNo', row.docNo) : null;
+    if (!existing) { row.status = 'new'; row.checked = true; }
+    else {
+      const titleMatches = normTitle(existing.data.title) === normTitle(row.title);
+      const sameVersion = String(existing.data.version||'') === String(row.version||'1');
+      const existingHasText = existing.data.fullText && existing.data.fullText.trim();
+      row.existingId = existing.id;
+      row.existingTitle = existing.data.title;
+      row.existingVersion = existing.data.version;
+      if (!titleMatches) { row.status = 'title-mismatch'; row.checked = true; }
+      else if (!sameVersion) { row.status = 'update'; row.checked = true; }
+      else if (!existingHasText) { row.status = 'dup-refill'; row.checked = true; }
+      else { row.status = 'dup-skip'; row.checked = false; }
+    }
+    rows.push(row);
     area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(${i+1}/${files.length})</div>`;
   }
   window._regBatchRows = rows;
   renderRegBatchPreview();
 }
+
+const BATCH_STATUS_BADGE = {
+  'new': '<span class="cat-badge" style="background:#d1ecf1;color:#0c5460">新文件</span>',
+  'update': '<span class="cat-badge" style="background:#d1ecf1;color:#0c5460">版次更新，將取代舊版</span>',
+  'dup-refill': '<span class="cat-badge" style="background:#FDF0DC;color:#8A5A00">版次相同但缺全文，將補全文</span>',
+  'dup-skip': '<span class="cat-badge" style="background:#e9ecef;color:#495057">版次相同且已有全文，建議略過</span>',
+  'title-mismatch': '<span class="cat-badge" style="background:#FCEBEB;color:#791F1F">同編號但名稱不同，將視為獨立新文件</span>'
+};
 
 function renderRegBatchPreview(){
   const rows = window._regBatchRows || [];
@@ -2706,6 +2743,8 @@ function renderRegBatchPreview(){
   if (rows.length === 0) { area.innerHTML = ''; return; }
   const tierOpts = t => [1,2,3,4].map(v=>`<option value="${v}" ${String(t)===String(v)?'selected':''}>${v}</option>`).join('');
   const rowsHtml = rows.map((r,i)=>`<tr>
+    <td><input type="checkbox" ${r.checked?'checked':''} onchange="window._regBatchRows[${i}].checked=this.checked"></td>
+    <td>${BATCH_STATUS_BADGE[r.status]||''}${r.existingTitle?`<div style="font-size:11px;color:var(--ts);margin-top:3px">現有：${escapeHtml(r.existingTitle)}（版次${escapeHtml(r.existingVersion||'—')}）</div>`:''}</td>
     <td>${escapeHtml(r.file.name)}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗</div>`:''}</td>
     <td><input type="text" id="regb-docno-${i}" value="${escapeHtml(r.docNo)}" style="min-width:150px" oninput="window._regBatchRows[${i}].docNo=this.value"></td>
     <td><input type="text" id="regb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:160px" oninput="window._regBatchRows[${i}].title=this.value"></td>
@@ -2714,25 +2753,28 @@ function renderRegBatchPreview(){
     <td><input type="text" id="regb-ver-${i}" value="${escapeHtml(r.version)}" style="width:50px" oninput="window._regBatchRows[${i}].version=this.value"></td>
     <td><input type="date" id="regb-date-${i}" value="${r.approvedDate||''}" oninput="window._regBatchRows[${i}].approvedDate=this.value"></td>
   </tr>`).join('');
+  const counts = rows.reduce((a,r)=>{a[r.status]=(a[r.status]||0)+1;return a;},{});
   area.innerHTML = `
-    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，請逐筆檢查／修改辨識結果（尤其是未帶出文件編號或處室的列），確認無誤後按下方按鈕送出</div>
+    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份：新文件 ${counts['new']||0}、版次更新 ${counts['update']||0}、缺全文將補件 ${counts['dup-refill']||0}、重複建議略過 ${counts['dup-skip']||0}${counts['title-mismatch']?`、同編號名稱不同 ${counts['title-mismatch']}`:''}。已依狀態預設勾選，請逐筆確認後再送出（尤其留意「同編號名稱不同」是否誤判）</div>
+    <div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked onchange="document.querySelectorAll('#reg-batch-preview .vtbl input[type=checkbox]').forEach((c,idx)=>{c.checked=this.checked;if(window._regBatchRows[idx])window._regBatchRows[idx].checked=this.checked;})"> 全選／全不選</label></div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px">
       <table class="vtbl">
-        <thead><tr><th>檔名</th><th>文件編號</th><th>文件名稱</th><th>所屬處室</th><th>位階</th><th>版次</th><th>核決日期</th></tr></thead>
+        <thead><tr><th></th><th>狀態</th><th>檔名</th><th>文件編號</th><th>文件名稱</th><th>所屬處室</th><th>位階</th><th>版次</th><th>核決日期</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
-    <button class="btn btn-primary" style="margin-top:10px" onclick="confirmRegBatchUpload()"><i class="ti ti-check"></i> 確認上傳 ${rows.length} 份規章</button>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="confirmRegBatchUpload()"><i class="ti ti-check"></i> 確認上傳已勾選項目</button>
   `;
 }
 
 async function confirmRegBatchUpload(){
-  const rows = window._regBatchRows || [];
-  if (rows.length === 0) return;
+  const allRows = window._regBatchRows || [];
+  const rows = allRows.filter(r => r.checked);
+  if (rows.length === 0) { showToast('請至少勾選一筆項目'); return; }
   const area = document.getElementById('reg-batch-preview');
   const btn = area.querySelector('.btn-primary');
   setBtnLoading(btn, `上傳中…(0/${rows.length})`);
-  let ok=0, fail=0, superseded=0, skippedDup=0;
+  let ok=0, fail=0, superseded=0;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     for (let i=0; i<rows.length; i++) {
@@ -2740,30 +2782,25 @@ async function confirmRegBatchUpload(){
       try {
         if (!r.title) throw new Error('缺文件名稱');
         const ver = r.version || '1';
-        const existing = await findActiveDoc('regulations', 'docNo', r.docNo, r.title);
-        const existingHasText = existing && existing.data.fullText && existing.data.fullText.trim();
-        const newHasText = r.text && r.text.trim();
-        if (existing && String(existing.data.version||'') === String(ver) && (existingHasText || !newHasText)) { skippedDup++; }
-        else {
-          const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
-          const docRef = await addDoc(collection(window._db, 'regulations'), {
-            docNo: r.docNo || '', title: r.title,
-            dept: r.dept || '', tier: parseInt(r.tier) || 2, version: ver,
-            approvedDate: r.approvedDate || '', parentDoc: '',
-            fileUrl, fileName: r.file.name, fileSize: r.file.size,
-            fullText: r.text || '', status: 'active',
-            createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
-          });
-          if (existing) { await supersedeDoc('regulations', existing.id, docRef.id); superseded++; }
-          ok++;
-        }
+        const fileUrl = await uploadFile(r.file, `regulations/${r.docNo||'unclassified'}/${ver}/${r.file.name}`);
+        const docRef = await addDoc(collection(window._db, 'regulations'), {
+          docNo: r.docNo || '', title: r.title,
+          dept: r.dept || '', tier: parseInt(r.tier) || 2, version: ver,
+          approvedDate: r.approvedDate || '', parentDoc: '',
+          fileUrl, fileName: r.file.name, fileSize: r.file.size,
+          fullText: r.text || '', status: 'active',
+          createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
+        });
+        if (r.existingId) { await supersedeDoc('regulations', r.existingId, docRef.id); superseded++; }
+        ok++;
       } catch(e) { fail++; }
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
-    if(ok>0) await logActivity('regulation','batch_create','',`批次上傳 ${ok} 份規章`,`${superseded}份取代舊版，${skippedDup}份重複略過`);
-    showToast(`已上傳 ${ok} 份規章${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因文件編號與版次都相同，判定為重複已略過`:''}</div>`;
+    const skipped = allRows.length - rows.length;
+    if(ok>0) await logActivity('regulation','batch_create','',`批次上傳 ${ok} 份規章`,`${superseded}份取代舊版`);
+    showToast(`已上傳 ${ok} 份規章${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skipped?`，${skipped} 份未勾選已略過`:''}`);
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skipped?`，${skipped} 份未勾選已略過`:''}</div>`;
     window._regBatchRows = [];
   } catch(e) {
     setBtnError(btn);
@@ -2777,37 +2814,54 @@ async function handleFormBatchFiles(input){
   const area = document.getElementById('form-batch-preview');
   if (files.length === 0) { area.innerHTML = '<div class="pholder">資料夾中沒有找到支援的檔案</div>'; return; }
   area.innerHTML = `<div class="pholder">正在解析檔名並辨識中…(0/${files.length})</div>`;
+  const normTitle=s=>(s||'').replace(/\s+/g,'').trim();
   const rows = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const fnMeta = extractMetaFromFilename(file.name);
+    let row;
     if (isExtractableFile(file.name)) {
       try {
         const {text} = await extractFileText(file, 500, (pi,pn,ptotal)=>{
           area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
         });
         const meta = extractDocMetaFromText(text, file.name);
-        rows.push({
+        row = {
           file, text,
           formNo: (fnMeta&&fnMeta.docNo) || meta.docNo,
           title: (fnMeta&&fnMeta.title) || meta.title,
           dept: (fnMeta&&fnMeta.dept) || meta.dept,
           version: (fnMeta&&fnMeta.version) || meta.version || '',
           approvedDate: meta.approvedDate
-        });
+        };
       } catch(e) {
-        rows.push({file, text:'', formNo:(fnMeta&&fnMeta.docNo)||'', title:(fnMeta&&fnMeta.title)||file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:(fnMeta&&fnMeta.dept)||'', version:(fnMeta&&fnMeta.version)||'', approvedDate:'', _extractError:e.message});
+        row = {file, text:'', formNo:(fnMeta&&fnMeta.docNo)||'', title:(fnMeta&&fnMeta.title)||file.name.replace(/\.[a-zA-Z0-9]+$/,''), dept:(fnMeta&&fnMeta.dept)||'', version:(fnMeta&&fnMeta.version)||'', approvedDate:'', _extractError:e.message};
       }
     } else {
-      rows.push({
+      row = {
         file, text:'',
         formNo: fnMeta ? fnMeta.docNo : '',
         title: fnMeta && fnMeta.title ? fnMeta.title : file.name.replace(/\.[a-zA-Z0-9]+$/,''),
         dept: fnMeta ? fnMeta.dept : '',
         version: fnMeta ? fnMeta.version : '',
         approvedDate: '', _notPdf: true
-      });
+      };
     }
+    const existing = row.formNo ? await findActiveDocSilent('forms', 'formNo', row.formNo) : null;
+    if (!existing) { row.status = 'new'; row.checked = true; }
+    else {
+      const titleMatches = normTitle(existing.data.title) === normTitle(row.title);
+      const sameVersion = String(existing.data.version||'') === String(row.version||'');
+      const existingHasText = existing.data.fullText && existing.data.fullText.trim();
+      row.existingId = existing.id;
+      row.existingTitle = existing.data.title;
+      row.existingVersion = existing.data.version;
+      if (!titleMatches) { row.status = 'title-mismatch'; row.checked = true; }
+      else if (!sameVersion) { row.status = 'update'; row.checked = true; }
+      else if (!existingHasText) { row.status = 'dup-refill'; row.checked = true; }
+      else { row.status = 'dup-skip'; row.checked = false; }
+    }
+    rows.push(row);
     area.innerHTML = `<div class="pholder">正在解析中…(${i+1}/${files.length})</div>`;
   }
   window._formBatchRows = rows;
@@ -2820,6 +2874,8 @@ function renderFormBatchPreview(){
   if (!area) return;
   if (rows.length === 0) { area.innerHTML = ''; return; }
   const rowsHtml = rows.map((r,i)=>`<tr>
+    <td><input type="checkbox" ${r.checked?'checked':''} onchange="window._formBatchRows[${i}].checked=this.checked"></td>
+    <td>${BATCH_STATUS_BADGE[r.status]||''}${r.existingTitle?`<div style="font-size:11px;color:var(--ts);margin-top:3px">現有：${escapeHtml(r.existingTitle)}（版次${escapeHtml(r.existingVersion||'—')}）</div>`:''}</td>
     <td>${escapeHtml(r.file.name)}${r._notPdf?`<div style="color:#856404;font-size:11px">舊版.doc格式暫不支援全文擷取，僅靠檔名辨識</div>`:''}${r._extractError?`<div style="color:#E24B4A;font-size:11px">擷取失敗：${escapeHtml(r._extractError)}</div>`:''}</td>
     <td><input type="text" id="formb-no-${i}" value="${escapeHtml(r.formNo)}" style="min-width:150px" oninput="window._formBatchRows[${i}].formNo=this.value"></td>
     <td><input type="text" id="formb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:160px" oninput="window._formBatchRows[${i}].title=this.value"></td>
@@ -2827,54 +2883,52 @@ function renderFormBatchPreview(){
     <td><input type="text" id="formb-ver-${i}" value="${escapeHtml(r.version)}" style="width:50px" oninput="window._formBatchRows[${i}].version=this.value"></td>
     <td><input type="date" id="formb-date-${i}" value="${r.approvedDate||''}" oninput="window._formBatchRows[${i}].approvedDate=this.value"></td>
   </tr>`).join('');
+  const counts = rows.reduce((a,r)=>{a[r.status]=(a[r.status]||0)+1;return a;},{});
   area.innerHTML = `
-    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，請逐筆檢查／修改辨識結果，確認無誤後按下方按鈕送出</div>
+    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份：新文件 ${counts['new']||0}、版次更新 ${counts['update']||0}、缺全文將補件 ${counts['dup-refill']||0}、重複建議略過 ${counts['dup-skip']||0}${counts['title-mismatch']?`、同編號名稱不同 ${counts['title-mismatch']}`:''}。已依狀態預設勾選，請逐筆確認後再送出</div>
+    <div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" checked onchange="document.querySelectorAll('#form-batch-preview .vtbl input[type=checkbox]').forEach((c,idx)=>{c.checked=this.checked;if(window._formBatchRows[idx])window._formBatchRows[idx].checked=this.checked;})"> 全選／全不選</label></div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px">
       <table class="vtbl">
-        <thead><tr><th>檔名</th><th>表單編號</th><th>表單名稱</th><th>所屬處室</th><th>版次</th><th>核決日期</th></tr></thead>
+        <thead><tr><th></th><th>狀態</th><th>檔名</th><th>表單編號</th><th>表單名稱</th><th>所屬處室</th><th>版次</th><th>核決日期</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
-    <button class="btn btn-primary" style="margin-top:10px" onclick="confirmFormBatchUpload()"><i class="ti ti-check"></i> 確認上傳 ${rows.length} 份表單</button>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="confirmFormBatchUpload()"><i class="ti ti-check"></i> 確認上傳已勾選項目</button>
   `;
 }
 
 async function confirmFormBatchUpload(){
-  const rows = window._formBatchRows || [];
-  if (rows.length === 0) return;
+  const allRows = window._formBatchRows || [];
+  const rows = allRows.filter(r => r.checked);
+  if (rows.length === 0) { showToast('請至少勾選一筆項目'); return; }
   const area = document.getElementById('form-batch-preview');
   const btn = area.querySelector('.btn-primary');
   setBtnLoading(btn, `上傳中…(0/${rows.length})`);
-  let ok=0, fail=0, superseded=0, skippedDup=0;
+  let ok=0, fail=0, superseded=0;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     for (let i=0; i<rows.length; i++) {
       const r = rows[i];
       try {
         if (!r.title) throw new Error('缺表單名稱');
-        const existing = r.formNo ? await findActiveDoc('forms', 'formNo', r.formNo, r.title) : null;
-        const existingHasText = existing && existing.data.fullText && existing.data.fullText.trim();
-        const newHasText = r.text && r.text.trim();
-        if (existing && r.version && String(existing.data.version||'') === String(r.version) && (existingHasText || !newHasText)) { skippedDup++; }
-        else {
-          const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
-          const docRef = await addDoc(collection(window._db, 'forms'), {
-            title: r.title, formNo: r.formNo || '', dept: r.dept || '', version: r.version || '',
-            approvedDate: r.approvedDate || '',
-            fileUrl, fileName: r.file.name, fileSize: r.file.size,
-            fullText: r.text || '', status: 'active',
-            createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
-          });
-          if (existing) { await supersedeDoc('forms', existing.id, docRef.id); superseded++; }
-          ok++;
-        }
+        const fileUrl = await uploadFile(r.file, `forms/${r.dept||'unassigned'}/${Date.now()}_${r.file.name}`);
+        const docRef = await addDoc(collection(window._db, 'forms'), {
+          title: r.title, formNo: r.formNo || '', dept: r.dept || '', version: r.version || '',
+          approvedDate: r.approvedDate || '',
+          fileUrl, fileName: r.file.name, fileSize: r.file.size,
+          fullText: r.text || '', status: 'active',
+          createdAt: serverTimestamp(), uploadedBy: window._uid, importedFromBatch: true
+        });
+        if (r.existingId) { await supersedeDoc('forms', r.existingId, docRef.id); superseded++; }
+        ok++;
       } catch(e) { fail++; }
       if (btn) btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 上傳中…(${i+1}/${rows.length})`;
     }
     setBtnSuccess(btn, '已完成');
-    if(ok>0) await logActivity('form','batch_create','',`批次上傳 ${ok} 份表單`,`${superseded}份取代舊版，${skippedDup}份重複略過`);
-    showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skippedDup?`，${skippedDup} 份因版次相同已略過`:''}`);
-    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skippedDup?`，${skippedDup} 份因表單編號與版次都相同，判定為重複已略過`:''}</div>`;
+    const skipped = allRows.length - rows.length;
+    if(ok>0) await logActivity('form','batch_create','',`批次上傳 ${ok} 份表單`,`${superseded}份取代舊版`);
+    showToast(`已上傳 ${ok} 份表單${superseded?`（其中 ${superseded} 份自動下架舊版本）`:''}${fail?`，${fail} 份失敗`:''}${skipped?`，${skipped} 份未勾選已略過`:''}`);
+    area.innerHTML = `<div class="info-box"><i class="ti ti-info-circle"></i>批次上傳完成：成功 ${ok} 份${superseded?`（${superseded} 份取代了舊版本）`:''}${fail?`，失敗 ${fail} 份，請檢查後重新上傳失敗的檔案`:''}${skipped?`，${skipped} 份未勾選已略過`:''}</div>`;
     window._formBatchRows = [];
   } catch(e) {
     setBtnError(btn);
