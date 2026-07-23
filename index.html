@@ -231,7 +231,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 52</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 53</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -716,10 +716,8 @@ function toggleNoticeExtendedFilter(){
   renderNoticeList();
 }
 function renderFilterUI(kind,categories){
-  const opts=categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   const chips=categories.map(c=>`<div class="chip" data-cat="${c.id}" style="background:${c.bg};color:${c.text}" onclick="toggleCatChip('${kind}','${c.id}')">${c.name}</div>`).join('');
   return `<div class="filter-row">
-    <select class="filter-select" id="${kind}-cat-select" onchange="setCatFilter('${kind}',this.value)"><option value="">全部類別</option>${opts}</select>
     <div class="chip-row" id="${kind}-chip-row">${chips}</div>
   </div>`;
 }
@@ -750,7 +748,15 @@ function pageNotice(){
     <div class="tab ${window._noticeState.tab==='all'?'active':''}" data-tab="all" onclick="switchListTab('notice','all')">全部</div>
   </div>
   <div class="sb"><i class="ti ti-search"></i><input id="notice-search" placeholder="搜尋通告（可用空白分隔多個關鍵字）" oninput="renderNoticeList()"></div>
-  <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:10px;cursor:pointer;width:fit-content"><input type="checkbox" id="notice-extended-only" onchange="toggleNoticeExtendedFilter()"> 只看展延通告</label>
+  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="notice-extended-only" onchange="toggleNoticeExtendedFilter()"> 只看展延通告</label>
+    <select id="notice-sort" onchange="renderNoticeList()" style="font-size:13px;padding:7px 10px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
+      <option value="expiryDate-asc">到期日期 近→遠</option>
+      <option value="expiryDate-desc">到期日期 遠→近</option>
+      <option value="issuedDate-desc">發布日期 新→舊</option>
+      <option value="issuedDate-asc">發布日期 舊→新</option>
+    </select>
+  </div>
   ${renderFilterUI('notice',NOTICE_CATEGORIES)}
   <div id="notice-list-area"><div class="pholder">載入中…</div></div>`;
 }
@@ -898,13 +904,8 @@ function renderNoticeList(){
     if(!matchesAllKeywords([d.title,d.content],kw))return false;
     return true;
   });
-  if(st.tab==='expired'){
-    list.sort((a,b)=>(b.expiryDate||'0000').localeCompare(a.expiryDate||'0000')); // 逾期分頁：剛下架的排最上面，越久以前過期的沉到最下面
-  } else if(st.tab==='all'){
-    list.sort((a,b)=>(b.issuedDate||'0000').localeCompare(a.issuedDate||'0000')); // 全部分頁：依發布日期新到舊
-  } else {
-    list.sort((a,b)=>(a.expiryDate||'9999').localeCompare(b.expiryDate||'9999')); // 效期內/缺到期日分頁：越快到期排越前面
-  }
+  const sortVal=document.getElementById('notice-sort')?.value||'expiryDate-asc';
+  list=sortDocs(list,sortVal);
   if(list.length===0){area.innerHTML='<div class="pholder">尚無符合條件的通告</div>';return;}
   area.innerHTML=list.map(d=>{
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
@@ -1208,10 +1209,10 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div id="notice-batch-preview"></div>
 </div></div>
 <div class="tabpane" id="nb-l"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>上傳中心發布的通告清單（Excel），系統會依「通告編號」逐筆比對資料庫，列出「已建置」與「尚未建置」的通告，尚未建置的可直接用清單資料一鍵建立（PDF/Word附件可之後再用編輯功能補上）；標題列須包含：發布單位、通告編號、通告名稱（或修正之規章/章/節或內容）、生效日期、失效日期</div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>上傳中心發布的通告清單（Excel），<b>可一次選取多個檔案</b>（例如站務中心通告清單+外單位通告清單、或今年+去年的清單一起比對），系統會逐一讀取（含檔案內多個工作表）並依「通告編號」比對資料庫，列出「已建置」與「尚未建置」的通告，尚未建置的可直接用清單資料一鍵建立（PDF/Word附件可之後再用編輯功能補上）；標題列須包含：發布單位、通告編號、通告名稱（或修正之規章/章/節或內容）、生效日期、失效日期；每次比對都是即時對照資料庫現況，不需保留舊清單，之後拿到新版清單直接重新上傳比對即可</div>
   <div style="margin-bottom:12px">
     <div id="notice-list-drop-zone" class="upload-zone" onclick="document.getElementById('notice-list-file').click()"><i class="ti ti-file-spreadsheet"></i><span>點擊或將 Excel 清單拖曳至此處</span></div>
-    <input type="file" id="notice-list-file" accept=".xlsx,.xls" style="display:none" onchange="handleNoticeListFile(this)">
+    <input type="file" id="notice-list-file" accept=".xlsx,.xls" multiple style="display:none" onchange="handleNoticeListFile(this)">
   </div>
   <div id="notice-list-result"></div>
 </div></div>
@@ -3047,55 +3048,70 @@ async function confirmNoticeBatchUpload(){
 
 // ===== 通告清單比對匯入：讀取中心發布的Excel清單，依通告編號比對資料庫，列出尚未建置的項目 =====
 async function handleNoticeListFile(input){
-  const file = input.files && input.files[0];
-  if (!file) return;
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
   const area = document.getElementById('notice-list-result');
   area.innerHTML = '<div class="pholder">讀取中…</div>';
   try {
     const XLSX = await ensureXlsx();
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
-    let headerIdx = -1, headerRow = [];
-    for (let i=0; i<Math.min(aoa.length,10); i++) {
-      if (aoa[i].some(c => String(c).includes('通告編號'))) { headerIdx = i; headerRow = aoa[i]; break; }
-    }
-    if (headerIdx < 0) { area.innerHTML = '<div class="pholder">找不到「通告編號」欄位，請確認Excel標題列格式</div>'; return; }
-    const findCol = (keywords) => {
+    const findCol = (headerRow, keywords) => {
       for (let c=0; c<headerRow.length; c++) {
         const h = String(headerRow[c]||'');
         if (keywords.some(k => h.includes(k))) return c;
       }
       return -1;
     };
-    const cUnit = findCol(['發布單位']);
-    const cNo = findCol(['通告編號']);
-    const cTitle = findCol(['通告名稱']);
-    const cContent = findCol(['修正之規章','內容']);
-    const cFrom = findCol(['生效日期']);
-    const cTo = findCol(['失效日期','有效期限']);
-    const cNote = findCol(['備註']);
-    const rows = [];
-    for (let i=headerIdx+1; i<aoa.length; i++) {
-      const row = aoa[i];
-      if (!row || row.every(c => String(c).trim()==='')) continue;
-      const noticeNo = cNo>=0 ? String(row[cNo]||'').trim() : '';
-      if (!noticeNo) continue;
-      const contentRaw = cContent>=0 ? String(row[cContent]||'').trim() : '';
-      const regMatch = contentRaw.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
-      rows.push({
-        noticeNo,
-        unit: cUnit>=0 ? String(row[cUnit]||'').trim() : '',
-        title: cTitle>=0 ? String(row[cTitle]||'').trim() : '',
-        content: contentRaw,
-        issuedDate: cFrom>=0 ? parseMinguoDate(String(row[cFrom]||'').trim()) : '',
-        expiryDate: cTo>=0 ? parseMinguoDate(String(row[cTo]||'').trim()) : '',
-        linkedRegulation: regMatch ? regMatch[0].toUpperCase() : '',
-        note: cNote>=0 ? String(row[cNote]||'').trim() : ''
-      });
+    let rows = [];
+    let noHeaderFiles = [];
+    for (const file of files) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      let foundInThisFile = false;
+      for (const sheetName of wb.SheetNames) {
+        const sheet = wb.Sheets[sheetName];
+        const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+        let headerIdx = -1, headerRow = [];
+        for (let i=0; i<Math.min(aoa.length,10); i++) {
+          if (aoa[i].some(c => String(c).includes('通告編號'))) { headerIdx = i; headerRow = aoa[i]; break; }
+        }
+        if (headerIdx < 0) continue; // 這個工作表沒有通告編號欄位，略過（可能是說明頁或其他用途的分頁）
+        foundInThisFile = true;
+        const cUnit = findCol(headerRow, ['發布單位']);
+        const cNo = findCol(headerRow, ['通告編號']);
+        const cTitle = findCol(headerRow, ['通告名稱']);
+        const cContent = findCol(headerRow, ['修正之規章','內容']);
+        const cFrom = findCol(headerRow, ['生效日期']);
+        const cTo = findCol(headerRow, ['失效日期','有效期限']);
+        const cNote = findCol(headerRow, ['備註']);
+        for (let i=headerIdx+1; i<aoa.length; i++) {
+          const row = aoa[i];
+          if (!row || row.every(c => String(c).trim()==='')) continue;
+          const noticeNo = cNo>=0 ? String(row[cNo]||'').trim() : '';
+          if (!noticeNo) continue;
+          const contentRaw = cContent>=0 ? String(row[cContent]||'').trim() : '';
+          const regMatch = contentRaw.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+          rows.push({
+            noticeNo,
+            unit: cUnit>=0 ? String(row[cUnit]||'').trim() : '',
+            title: cTitle>=0 ? String(row[cTitle]||'').trim() : '',
+            content: contentRaw,
+            issuedDate: cFrom>=0 ? parseMinguoDate(String(row[cFrom]||'').trim()) : '',
+            expiryDate: cTo>=0 ? parseMinguoDate(String(row[cTo]||'').trim()) : '',
+            linkedRegulation: regMatch ? regMatch[0].toUpperCase() : '',
+            note: cNote>=0 ? String(row[cNote]||'').trim() : '',
+            sourceFile: file.name + (wb.SheetNames.length>1?`（${sheetName}）`:'')
+          });
+        }
+      }
+      if (!foundInThisFile) noHeaderFiles.push(file.name);
     }
-    if (rows.length === 0) { area.innerHTML = '<div class="pholder">沒有讀到任何有效資料列</div>'; return; }
+    if (rows.length === 0) {
+      area.innerHTML = `<div class="pholder">沒有讀到任何有效資料列${noHeaderFiles.length?`（${noHeaderFiles.join('、')} 找不到「通告編號」欄位，請確認格式）`:''}</div>`;
+      return;
+    }
+    // 同一份通告編號可能同時出現在多個來源檔案（例如去年+今年清單重疊），去除重複，保留第一筆出現的
+    const seen = new Set();
+    rows = rows.filter(r => { const key=r.noticeNo.toUpperCase(); if(seen.has(key)) return false; seen.add(key); return true; });
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const snap = await getDocs(query(collection(window._db, 'notices'), where('status','==','active')));
     const existingNos = new Set();
@@ -3120,7 +3136,7 @@ function renderNoticeListResult(){
       const idx = rows.indexOf(r);
       return `<div class="list-card" style="border-left-color:#856404">
         <div style="font-size:13px;font-weight:600">${escapeHtml(r.title||'（無標題）')} <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(r.noticeNo)}）</span></div>
-        <div style="font-size:12px;color:var(--ts);margin-top:6px">發布單位：${escapeHtml(r.unit||'—')}　生效：${r.issuedDate||'—'}　失效：${r.expiryDate||'—'}${r.note?'　備註：'+escapeHtml(r.note):''}</div>
+        <div style="font-size:12px;color:var(--ts);margin-top:6px">發布單位：${escapeHtml(r.unit||'—')}　生效：${r.issuedDate||'—'}　失效：${r.expiryDate||'—'}${r.note?'　備註：'+escapeHtml(r.note):''}${r.sourceFile?`　<span style="color:var(--tt)">來源：${escapeHtml(r.sourceFile)}</span>`:''}</div>
         <div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="createNoticeFromListRow(${idx})"><i class="ti ti-plus"></i> 用此資料建立通告</button></div>
       </div>`;
     }).join('') : '<div class="info-box"><i class="ti ti-circle-check"></i>清單裡的通告全部都已建置</div>'}
