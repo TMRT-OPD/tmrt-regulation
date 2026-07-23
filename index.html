@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+<script>
+(function(){
+  // 偵測「這份頁面是不是被另存成檔案、事後在本機打開」而非正牌連線——用來控制浮水印是否顯示
+  // 正常連線協定是 https:，且網域是本系統網址；本機開啟另存的html檔案，協定會是 file:
+  var isSavedCopy = (location.protocol === 'file:') || (location.hostname && location.hostname !== 'tmrt-opd.github.io');
+  if (isSavedCopy) document.documentElement.classList.add('is-saved-copy');
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>規章查找系統</title>
@@ -166,7 +174,8 @@ textarea{resize:vertical;min-height:80px}
   .info-box,.warn-box{padding:9px 11px;font-size:11.5px}
 }
 
-#watermark-overlay{position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden;display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;transform:rotate(-22deg) scale(1.5)}
+#watermark-overlay{position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden;display:none;flex-wrap:wrap;align-content:space-around;justify-content:space-around;transform:rotate(-22deg) scale(1.5)}
+html.is-saved-copy #watermark-overlay{display:flex}
 #watermark-overlay span{font-size:14px;font-weight:500;color:var(--tp);opacity:0.22;white-space:nowrap;margin:6px 14px}
 </style>
 
@@ -236,7 +245,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 55</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 56</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
