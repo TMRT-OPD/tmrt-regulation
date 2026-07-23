@@ -247,7 +247,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 59</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 60</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1485,7 +1485,7 @@ function renderEipResults(totalScanned){
     const actionBtn = r.status === 'missing'
       ? `<button class="btn btn-sm" onclick="gp('admin-upload-reg',null)"><i class="ti ti-upload"></i> 前往規章上傳</button>
          <button class="btn btn-sm" onclick="gp('admin-upload-form',null)"><i class="ti ti-upload"></i> 前往表單上傳</button>`
-      : `<button class="btn btn-sm" onclick='openEdit(${JSON.stringify(r.kind)},${JSON.stringify(r.docId)})'><i class="ti ti-edit"></i> 前往編輯此${r.kind==='regulation'?'規章':'表單'}</button>`;
+      : `<button class="btn btn-sm" onclick="gp(${JSON.stringify(r.kind==='regulation'?'admin-upload-reg':'admin-upload-form')},null)"><i class="ti ti-upload"></i> 前往${r.kind==='regulation'?'規章':'表單'}上傳新版次</button>`;
     return `<div class="list-card" style="border-left-color:var(--ti)" id="eip-item-${i}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div>${badge} <span style="font-weight:500;font-size:13px">${escapeHtml(r.name)}</span></div>
