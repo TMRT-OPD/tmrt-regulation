@@ -59,6 +59,7 @@ body{font-family:var(--fs);background:var(--ct);display:flex;min-height:100vh;co
 .card-title{font-size:13px;font-weight:500;margin-bottom:10px}
 .btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:12px;border-radius:var(--rm);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);cursor:pointer;font-family:var(--fs)}
 .btn-icon{width:28px;height:28px;padding:0;justify-content:center;gap:0}
+.btn-icon-slot{display:inline-block;width:28px;height:28px}
 .btn:hover{background:var(--cs)}
 .btn-primary{background:#378ADD;color:#fff;border-color:#378ADD}.btn-primary:hover{background:#185FA5}
 .btn-danger{background:#E24B4A;color:#fff;border-color:#E24B4A}.btn-danger:hover{background:#A32D2D}
@@ -248,7 +249,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 64</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 65</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1897,9 +1898,10 @@ async function loadUsers(){
       const lastLogin=data.lastLoginAt&&typeof data.lastLoginAt.toDate==='function'?data.lastLoginAt.toDate().toLocaleString('zh-TW',{hour12:false}):'從未登入';
       const lvl=data.level||'B';
       const ipCell=lvl==='S'?'<span style="color:var(--ts)">不限制</span>':(data.boundIP?data.boundIP:'<span style="color:var(--ts)">尚未綁定</span>');
-      const unbindBtn=(lvl!=='S'&&data.boundIP)?`<button class="btn btn-sm btn-icon" title="解除IP綁定" onclick="unbindIP('${id}','${empId}')"><i class="ti ti-shield-off"></i></button>`:'';
+      const unbindBtn=(lvl!=='S'&&data.boundIP)?`<button class="btn btn-sm btn-icon" title="解除IP綁定" onclick="unbindIP('${id}','${empId}')"><i class="ti ti-shield-off"></i></button>`:`<span class="btn-icon-slot"></span>`;
       const emailCell=companyEmail?escapeHtml(companyEmail):'<span style="color:#E24B4A;font-size:11px">未填寫</span>';
-      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td style="font-size:12px">${emailCell}</td><td><span class="badge lv-${lvl.toLowerCase()}">${lvl} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="font-size:11px">${ipCell}</td><td style="display:flex;gap:4px"><button class="btn btn-sm btn-icon" title="編輯" onclick="editAcc('${id}','${data.id}','${escapeHtml(data.name||'')}','${lvl}','${escapeHtml(companyEmail)}')"><i class="ti ti-edit"></i></button>${unbindBtn}${!isSelf?`<button class="btn btn-sm btn-icon btn-danger" title="刪除" onclick="deleteAcc('${id}','${data.id||''}')"><i class="ti ti-trash"></i></button>`:''}</td>`;
+      const deleteBtn=!isSelf?`<button class="btn btn-sm btn-icon btn-danger" title="刪除" onclick="deleteAcc('${id}','${data.id||''}')"><i class="ti ti-trash"></i></button>`:`<span class="btn-icon-slot"></span>`;
+      tr.innerHTML=`<td>${empId}</td><td>${data.name||'—'}</td><td style="font-size:12px">${emailCell}</td><td><span class="badge lv-${lvl.toLowerCase()}">${lvl} 級</span></td><td>${data.createdAt?new Date(data.createdAt.toDate()).toLocaleDateString('zh-TW'):'—'}</td><td style="font-size:11px;color:var(--ts)">${lastLogin}</td><td style="font-size:11px">${ipCell}</td><td style="display:flex;gap:4px"><button class="btn btn-sm btn-icon" title="編輯" onclick="editAcc('${id}','${data.id}','${escapeHtml(data.name||'')}','${lvl}','${escapeHtml(companyEmail)}')"><i class="ti ti-edit"></i></button>${unbindBtn}${deleteBtn}</td>`;
       tbody.appendChild(tr);
     });
     const banner=document.getElementById('missing-email-banner');
