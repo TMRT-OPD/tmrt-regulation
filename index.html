@@ -247,7 +247,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 62</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 63</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2211,7 +2211,8 @@ async function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">關聯通告編號（選填，多筆可用頓號或逗號分隔）</label><input type="text" id="ed-relatedNotices" value="${escapeHtml(d.relatedNotices||'')}" placeholder="例：SOC-1140910-01、SOC-1140911-01"></div>
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
-        <div style="margin-top:8px"><label class="btn btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> 新增／替換附件<input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list')"></label></div>
+        <div id="ed-nfs-drop-zone" class="upload-zone" style="margin-top:8px" onclick="document.getElementById('ed-nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處（可一次選多個檔案，例如同時上傳Word文字版＋簽核用PDF）</span></div>
+        <input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list')">
         <div class="file-list" id="ed-nfs-list" style="margin-top:6px"></div>
         <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若要整份取代舊附件，先移除舊附件再新增</div>
       </div>
@@ -2252,6 +2253,7 @@ async function openEdit(kind, docId){
       <div class="info-box"><i class="ti ti-info-circle"></i>修改表單編號會影響版本比對與歷史版本查詢，請謹慎確認</div>`;
   }
   body.innerHTML=html;
+  if(kind==='notice') initDropZone('ed-nfs-drop-zone','ed-nfs','ed-nfs-list');
   document.getElementById('modal-edit').classList.add('open');
 }
 
