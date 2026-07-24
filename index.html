@@ -249,7 +249,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 65</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 66</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -528,6 +528,7 @@ function pageSearch(){return`<div class="ptitle">綜合查詢</div><div class="p
   <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="sf-notice" checked onchange="doSearch(document.getElementById('search-kw').value)">通告</label>
   <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="sf-reg" checked onchange="doSearch(document.getElementById('search-kw').value)">規章</label>
   <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="sf-form" checked onchange="doSearch(document.getElementById('search-kw').value)">表單</label>
+  <label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding-left:10px;border-left:1px solid var(--bt)"><input type="checkbox" id="sf-hide-expired" checked onchange="doSearch(document.getElementById('search-kw').value)">隱藏逾期（勤前指示／通告）</label>
   <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
     <span style="color:var(--ts)">處室／單位</span>
     <select id="sf-dept" onchange="doSearch(document.getElementById('search-kw').value)" style="font-size:12px;padding:4px 6px;border:0.5px solid var(--bt);border-radius:var(--rs);background:#fff">
@@ -593,14 +594,17 @@ async function runSearch(kw){
     const wantReg=document.getElementById('sf-reg')?.checked!==false;
     const wantForm=document.getElementById('sf-form')?.checked!==false;
     const deptFilter=document.getElementById('sf-dept')?.value||'';
+    const hideExpired=document.getElementById('sf-hide-expired')?.checked!==false;
+    const today=new Date().toISOString().slice(0,10);
+    const isExpired=d=>isValidDate(d.expiryDate)&&d.expiryDate<today;
     const [dutySnap, noticeSnap, regSnap, formSnap] = await Promise.all([
       wantDuty?getDocs(query(collection(window._db,'duty_briefs'), where('status','==','active'))):Promise.resolve({forEach:()=>{}}),
       wantNotice?getDocs(query(collection(window._db,'notices'), where('status','==','active'))):Promise.resolve({forEach:()=>{}}),
       wantReg?getDocs(query(collection(window._db,'regulations'), where('status','==','active'))):Promise.resolve({forEach:()=>{}}),
       wantForm?getDocs(query(collection(window._db,'forms'), where('status','==','active'))):Promise.resolve({forEach:()=>{}})
     ]);
-    let dutyMatches=[]; dutySnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])) dutyMatches.push({id:doc.id,...d});});
-    let noticeMatches=[]; noticeSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])) noticeMatches.push({id:doc.id,...d});});
+    let dutyMatches=[]; dutySnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])&&(!hideExpired||!isExpired(d))) dutyMatches.push({id:doc.id,...d});});
+    let noticeMatches=[]; noticeSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])&&(!hideExpired||!isExpired(d))) noticeMatches.push({id:doc.id,...d});});
     let regMatches=[]; regSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.dept===deptFilter)&&matchText([d.title,d.docNo,d.fullText])) regMatches.push({id:doc.id,...d});});
     let formMatches=[]; formSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.dept===deptFilter)&&matchText([d.title,d.formNo,d.fullText])) formMatches.push({id:doc.id,...d});});
     // 排序：標題比對到的排最前面，其餘依內文比對排後面；同組再依日期新到舊排序
@@ -641,8 +645,9 @@ function renderSearchItem(d,kind,kw){
   if(kind==='duty'){
     const cat=DUTY_CATEGORIES.find(c=>c.id===d.category);
     const n=countMatches(d.content,kw);
-    return `<div class="list-card">
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}</div>
+    const expired=isValidDate(d.expiryDate)&&d.expiryDate<new Date().toISOString().slice(0,10);
+    return `<div class="list-card ${expired?'expired':''}">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}${expired?expiredBadge():''}</div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
@@ -651,8 +656,9 @@ function renderSearchItem(d,kind,kw){
   } else if(kind==='notice'){
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
     const n=countMatches(d.content,kw);
-    return `<div class="list-card">
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}</div>
+    const expired=isValidDate(d.expiryDate)&&d.expiryDate<new Date().toISOString().slice(0,10);
+    return `<div class="list-card ${expired?'expired':''}">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">${catBadge(cat)}${expired?expiredBadge():''}</div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
