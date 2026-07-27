@@ -249,7 +249,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 66</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 67</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1071,11 +1071,18 @@ function sortDocs(list, sortVal, numFieldMap){
   const [field, dir] = (sortVal||'docNo-asc').split('-');
   const mul = dir==='desc' ? -1 : 1;
   const isNum = numFieldMap && numFieldMap.includes(field);
+  const tieBreak=(a,b)=>{
+    const aid=a.noticeNo||a.docNo||a.formNo||'';
+    const bid=b.noticeNo||b.docNo||b.formNo||'';
+    return String(aid).localeCompare(String(bid), 'zh-Hant', {numeric:true});
+  };
   return [...list].sort((a,b)=>{
     let av=a[field], bv=b[field];
-    if(field==='version'){ av=parseFloat(av)||0; bv=parseFloat(bv)||0; return (av-bv)*mul; }
+    if(field==='version'){ av=parseFloat(av)||0; bv=parseFloat(bv)||0; if(av!==bv) return (av-bv)*mul; return tieBreak(a,b); }
     av=(av||''); bv=(bv||'');
-    return String(av).localeCompare(String(bv), 'zh-Hant', {numeric:true})*mul;
+    const cmp=String(av).localeCompare(String(bv), 'zh-Hant', {numeric:true});
+    if(cmp!==0) return cmp*mul;
+    return tieBreak(a,b);
   });
 }
 
@@ -2390,6 +2397,12 @@ async function saveEdit(){
       }
       localArr=window._formListDocs; renderFn=renderFormList;
     }
+    let preEditExpired=null;
+    if(kind==='duty'||kind==='notice'){
+      const prevData=(localArr||[]).find(x=>x.id===docId);
+      const today=new Date().toISOString().slice(0,10);
+      if(prevData) preEditExpired=isValidDate(prevData.expiryDate)&&prevData.expiryDate<today;
+    }
     await updateDoc(doc(window._db,collectionName,docId),payload);
     const deptForLog = kind==='notice' ? payload.unit : (payload.dept || (localArr||[]).find(x=>x.id===docId)?.dept || '');
     await logActivity(kind,'update',docId,title,'',deptForLog);
@@ -2398,7 +2411,14 @@ async function saveEdit(){
       if(idx>=0) Object.assign(localArr[idx],payload,{updatedAt:{toDate:()=>new Date()}});
     }
     setBtnSuccess(btn,'已儲存');
-    showToast('已更新');
+    if(preEditExpired===true){
+      const today=new Date().toISOString().slice(0,10);
+      const nowExpired=isValidDate(payload.expiryDate)&&payload.expiryDate<today;
+      if(!nowExpired) showToast('已更新，效期已延後，已移至效期內清單');
+      else showToast('已更新');
+    } else {
+      showToast('已更新');
+    }
     closeModal('modal-edit');
     if(renderFn) renderFn();
     if((kind==='regulation'||kind==='form') && document.getElementById('orphan-result')) loadOrphanCheck();
