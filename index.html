@@ -85,6 +85,19 @@ body{font-family:var(--fs);background:var(--ct);display:flex;min-height:100vh;co
 input[type=text],input[type=date],select,textarea{font-family:var(--fs);font-size:12px;padding:7px 9px;border-radius:var(--rm);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);width:100%}
 input:focus,select:focus,textarea:focus{outline:none;border-color:#378ADD}
 textarea{resize:vertical;min-height:80px}
+.rich-toolbar{display:flex;gap:4px;margin-bottom:4px}
+.rich-toolbar button{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--rs);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);cursor:pointer;font-family:var(--fs);font-size:12px}
+.rich-toolbar button.active{background:#378ADD;color:#fff;border-color:#378ADD}
+.rich-toolbar button[data-cmd=bold]{font-weight:700}
+.rich-toolbar button[data-cmd=underline]{text-decoration:underline}
+.rich-toolbar button[data-cmd=strikeThrough]{text-decoration:line-through}
+.rich-editor{font-family:var(--fs);font-size:12px;padding:7px 9px;border-radius:var(--rm);border:0.5px solid var(--bs);background:var(--cp);color:var(--tp);width:100%;min-height:120px;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:break-word}
+.rich-editor:empty:before{content:attr(data-placeholder);color:var(--tt)}
+.rich-editor:focus{outline:none;border-color:#378ADD}
+.rich-content-view{white-space:pre-wrap}
+.rich-content-view b,.rich-content-view strong{font-weight:700}
+.rich-content-view u{text-decoration:underline}
+.rich-content-view s,.rich-content-view strike{text-decoration:line-through}
 .info-box{background:var(--ci);border:0.5px solid var(--bi);border-radius:var(--rm);padding:10px 14px;font-size:12px;color:var(--ti);margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
 .warn-box{background:#FAEEDA;border:0.5px solid #FAC775;border-radius:var(--rm);padding:10px 14px;font-size:12px;color:#633806;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
@@ -249,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 67</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 68</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -411,8 +424,8 @@ function gp(key,el,param){
   if(key==='notice') setTimeout(loadNoticeList, 0);
   if(key==='admin-upload-reg') { initDropZone('reg-drop-zone','rfs','rfl'); initBatchDropZone('reg-batch-drop-zone','reg-batch-folder'); }
   if(key==='admin-upload-form') { initDropZone('form-drop-zone','ffs','ffl'); initBatchDropZone('form-batch-drop-zone','form-batch-folder'); }
-  if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); }
-  if(key==='admin-upload-notice') { initDropZone('notice-drop-zone','nfs','nfl'); initDropZone('notice-list-drop-zone','notice-list-file',null); initDropZone('notice-attach-drop-zone','notice-attach-files',null); initBatchDropZone('notice-batch-drop-zone','notice-batch-folder'); }
+  if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); initRichEditor('dc','dc-tb'); }
+  if(key==='admin-upload-notice') { initDropZone('notice-drop-zone','nfs','nfl'); initDropZone('notice-list-drop-zone','notice-list-file',null); initDropZone('notice-attach-drop-zone','notice-attach-files',null); initBatchDropZone('notice-batch-drop-zone','notice-batch-folder'); initRichEditor('nc','nc-tb'); }
 }
 
 function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">系統說明與參考依據</div>
@@ -740,6 +753,99 @@ function applyBRestrictions(){
   document.addEventListener('cut', e => { if (!isInputEl(e.target)) e.preventDefault(); });
 }
 function isValidDate(s){return !!(s && /^\d{4}-\d{2}-\d{2}$/.test(s));}
+// ===== 富文字內容處理（勤前指示／通告內容欄位：支援粗體/底線/刪除線）=====
+const RICH_ALLOWED_TAGS={B:'B',STRONG:'B',U:'U',S:'S',STRIKE:'S',DEL:'S',BR:'BR',DIV:'DIV',P:'DIV'};
+function sanitizeRichHtml(rawHtml){
+  const container=document.createElement('div');
+  container.innerHTML=rawHtml||'';
+  function walk(node){
+    let out='';
+    node.childNodes.forEach(child=>{
+      if(child.nodeType===3){
+        out+=escapeHtml(child.textContent);
+      } else if(child.nodeType===1){
+        const tag=child.tagName;
+        if(tag==='SCRIPT'||tag==='STYLE')return;
+        if(tag==='SPAN'||tag==='FONT'){
+          const style=(child.getAttribute('style')||'').toLowerCase();
+          const fw=(child.style&&child.style.fontWeight)||'';
+          const bold=style.includes('line-through')===false&&(style.includes('bold')||parseInt(fw)>=600||tag==='FONT'&&child.getAttribute('weight')==='bold');
+          const underline=style.includes('underline')&&!style.includes('none');
+          const strike=style.includes('line-through');
+          let inner=walk(child);
+          if(strike)inner=`<s>${inner}</s>`;
+          if(underline)inner=`<u>${inner}</u>`;
+          if(bold)inner=`<b>${inner}</b>`;
+          out+=inner;
+          return;
+        }
+        const mapped=RICH_ALLOWED_TAGS[tag];
+        if(mapped==='BR'){out+='<br>';return;}
+        if(mapped==='DIV'){out+=walk(child)+'<br>';return;}
+        if(mapped){out+=`<${mapped.toLowerCase()}>${walk(child)}</${mapped.toLowerCase()}>`;return;}
+        out+=walk(child); // 不在允許清單內的標籤：拆掉標籤，保留內部文字/子節點
+      }
+    });
+    return out;
+  }
+  return walk(container).replace(/(<br>)+$/,''); // 移除結尾多餘換行
+}
+function stripHtmlToText(html){
+  if(!html)return '';
+  const container=document.createElement('div');
+  container.innerHTML=html.replace(/<br\s*\/?>/gi,'\n').replace(/<\/(div|p)>/gi,'\n');
+  return (container.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
+}
+function highlightRichHtml(html,kw){
+  const kws=splitKeywords(kw);
+  if(!kws.length)return html;
+  const parts=(html||'').split(/(<[^>]+>)/g);
+  return parts.map(part=>{
+    if(part.startsWith('<'))return part;
+    let seg=part;
+    kws.forEach(k=>{
+      const re=new RegExp(escapeRegex(escapeHtml(k)),'gi');
+      seg=seg.replace(re,m=>`<mark class="kw-hl">${m}</mark>`);
+    });
+    return seg;
+  }).join('');
+}
+function renderContentBlock(d,kw){
+  if(d.contentHtml)return `<div class="rich-content-view" style="font-size:12px;color:var(--ts);margin-top:6px">${highlightRichHtml(d.contentHtml,kw)}</div>`;
+  return d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:'';
+}
+function initRichEditor(editorId,toolbarId){
+  const editor=document.getElementById(editorId);
+  const toolbar=document.getElementById(toolbarId);
+  if(!editor||!toolbar)return;
+  toolbar.querySelectorAll('button[data-cmd]').forEach(btn=>{
+    btn.onmousedown=e=>e.preventDefault(); // 避免按按鈕時編輯區失焦
+    btn.onclick=()=>{ editor.focus(); document.execCommand(btn.dataset.cmd,false,null); updateRichToolbarState(toolbarId); };
+  });
+  editor.addEventListener('paste',e=>{
+    e.preventDefault();
+    const html=e.clipboardData.getData('text/html');
+    const text=e.clipboardData.getData('text/plain');
+    const insertHtml=html?sanitizeRichHtml(html):escapeHtml(text).replace(/\n/g,'<br>');
+    document.execCommand('insertHTML',false,insertHtml);
+  });
+  editor.addEventListener('keyup',()=>updateRichToolbarState(toolbarId));
+  editor.addEventListener('mouseup',()=>updateRichToolbarState(toolbarId));
+}
+function updateRichToolbarState(toolbarId){
+  const toolbar=document.getElementById(toolbarId);
+  if(!toolbar)return;
+  toolbar.querySelectorAll('button[data-cmd]').forEach(btn=>{
+    try{ btn.classList.toggle('active',document.queryCommandState(btn.dataset.cmd)); }catch(e){}
+  });
+}
+function richToolbarHtml(toolbarId){
+  return `<div class="rich-toolbar" id="${toolbarId}">
+    <button type="button" data-cmd="bold" title="粗體">B</button>
+    <button type="button" data-cmd="underline" title="底線">U</button>
+    <button type="button" data-cmd="strikeThrough" title="刪除線">S</button>
+  </div>`;
+}
 function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function visibleAttachments(attachments){
   // B級（無下載原始檔案權限）只能看到PDF附件（開啟即為檢視，不算下載檔案）；Word等其他格式一律隱藏，避免被下載
@@ -908,7 +1014,7 @@ function renderDutyList(){
       </div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}　宣達者：${d.announcer||'—'}${d.unit?'　單位：'+d.unit:''}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
+      ${renderContentBlock(d,kw)}
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
       ${lastUpdatedLine(d)}
       ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
@@ -969,7 +1075,7 @@ function renderNoticeList(){
       </div>
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}${d.noticeNo?` <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(d.noticeNo)}）</span>`:''}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<span style="text-decoration:line-through;color:var(--tt)">${d.originalExpiryDate}</span> → <b style="color:#8A5A00">${d.expiryDate||'—'}</b>`:(d.expiryDate||'—')}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}${d.relatedNotices?'　關聯通告：'+escapeHtml(d.relatedNotices):''}</div>
-      ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px;white-space:pre-wrap">${highlightText(d.content,kw)}</div>`:''}
+      ${renderContentBlock(d,kw)}
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
       ${lastUpdatedLine(d)}
       ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
@@ -1221,7 +1327,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">事項標題 *</label><input type="text" id="dt" placeholder="請輸入勤前指示標題"></div><div></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">分類 *</label><select id="dcat"><option value="">請選擇分類</option>${DUTY_CATEGORIES.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div><div><label class="fl2">宣達者 *</label><input type="text" id="dann" placeholder="請輸入宣達者姓名"></div></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">發布日期 *</label><input type="date" id="df"></div><div><label class="fl2">到期日期</label><input type="date" id="de"></div></div>
-  <div style="margin-bottom:12px"><label class="fl2">內容說明</label><textarea id="dc" placeholder="請輸入勤前指示內容…"></textarea></div>
+  <div style="margin-bottom:12px"><label class="fl2">內容說明</label>${richToolbarHtml('dc-tb')}<div id="dc" class="rich-editor" contenteditable="true" data-placeholder="請輸入勤前指示內容…"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">附件（支援 PDF、Word、Excel、PPT、圖片）</label>
     <div id="duty-drop-zone" class="upload-zone" onclick="document.getElementById('dfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處</span></div>
     <input type="file" id="dfs" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" style="display:none" onchange="showFiles(this,'dfl')">
@@ -1245,7 +1351,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div style="margin-bottom:12px"><label class="fl2">通告標題 *</label><input type="text" id="nt" placeholder="請輸入通告標題"></div>
   <div class="fg2" style="margin-bottom:12px"><div><label class="fl2">生效日期 *</label><input type="date" id="nf"></div><div><label class="fl2">到期日期 *</label><input type="date" id="ne"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">是否為展延通告</label><select id="nx"><option value="0">否（首次發布）</option><option value="1">是（展延一次）</option></select></div>
-  <div style="margin-bottom:12px"><label class="fl2">通告內容</label><textarea id="nc" placeholder="請輸入通告內容…"></textarea></div>
+  <div style="margin-bottom:12px"><label class="fl2">通告內容</label>${richToolbarHtml('nc-tb')}<div id="nc" class="rich-editor" contenteditable="true" data-placeholder="請輸入通告內容…"></div></div>
   <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="nreg" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
   <div style="margin-bottom:12px"><label class="fl2">附件</label>
     <div id="notice-drop-zone" class="upload-zone" onclick="document.getElementById('nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處（可一次選多個檔案，例如同時上傳Word文字版＋簽核用PDF）</span></div>
@@ -2045,18 +2151,21 @@ async function saveDuty() {
         attachments.push({name: file.name, url, size: file.size});
       }
     }
+    const contentHtml = sanitizeRichHtml(document.getElementById('dc')?.innerHTML || '');
     const newRef = await addDoc(collection(window._db, 'duty_briefs'), {
       title, category, announcer,
       issuedDate: fromDate,
       expiryDate: document.getElementById('de')?.value || null,
-      content: document.getElementById('dc')?.value || '',
+      content: stripHtmlToText(contentHtml),
+      contentHtml,
       attachments, status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
     });
     await logActivity('duty','create',newRef.id,title);
     setBtnSuccess(btn, '已儲存');
     showToast('勤前指示已儲存');
-    ['dt','dc','dann'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['dt','dann'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const dcEl = document.getElementById('dc'); if (dcEl) dcEl.innerHTML = '';
     ['df','de'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const dcatEl = document.getElementById('dcat'); if (dcatEl) dcatEl.value = '';
     const fl = document.getElementById('dfl'); if (fl) fl.innerHTML = '';
@@ -2087,6 +2196,7 @@ async function saveNotice() {
         attachments.push({name: file.name, url, size: file.size});
       }
     }
+    const contentHtml = sanitizeRichHtml(document.getElementById('nc')?.innerHTML || '');
     const newRef = await addDoc(collection(window._db, 'notices'), {
       title, category,
       noticeNo: document.getElementById('nno')?.value?.trim() || '',
@@ -2095,7 +2205,8 @@ async function saveNotice() {
       expiryDate: toDate,
       extended: document.getElementById('nx')?.value === '1',
       revised: false,
-      content: document.getElementById('nc')?.value || '',
+      content: stripHtmlToText(contentHtml),
+      contentHtml,
       linkedRegulation: document.getElementById('nreg')?.value || '',
       attachments, fullText: window._noticeExtractedText || '', status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid
@@ -2104,7 +2215,8 @@ async function saveNotice() {
     setBtnSuccess(btn, '已發布');
     showToast('通告已發布');
     window._noticeExtractedText = '';
-    ['nno','nt','nc','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['nno','nt','nreg'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const ncEl2 = document.getElementById('nc'); if (ncEl2) ncEl2.innerHTML = '';
     const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
     const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -2204,7 +2316,7 @@ async function openEdit(kind, docId){
         <div><label class="fl2">發布日期</label><input type="date" id="ed-issuedDate" value="${d.issuedDate||''}"></div>
         <div><label class="fl2">到期日期</label><input type="date" id="ed-expiryDate" value="${d.expiryDate||''}"></div>
       </div>
-      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>`;
+      <div style="margin-bottom:12px"><label class="fl2">內容</label>${richToolbarHtml('ed-content-tb')}<div id="ed-content" class="rich-editor" contenteditable="true">${d.contentHtml||escapeHtml(d.content||'')}</div></div>`;
   } else if(kind==='notice'){
     titleEl.textContent='編輯通告';
     window._editNoticeAttachments = JSON.parse(JSON.stringify(d.attachments||[]));
@@ -2223,7 +2335,7 @@ async function openEdit(kind, docId){
         <div><label class="fl2">是否展延</label><select id="ed-extended" onchange="autoExtendNoticeExpiry(this)"><option value="0" ${!d.extended?'selected':''}>否</option><option value="1" ${d.extended?'selected':''}>是</option></select></div>
         <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
-      <div style="margin-bottom:12px"><label class="fl2">內容</label><textarea id="ed-content">${escapeHtml(d.content||'')}</textarea></div>
+      <div style="margin-bottom:12px"><label class="fl2">內容</label>${richToolbarHtml('ed-content-tb')}<div id="ed-content" class="rich-editor" contenteditable="true">${d.contentHtml||escapeHtml(d.content||'')}</div></div>
       <div style="margin-bottom:12px"><label class="fl2">關聯通告編號（選填，多筆可用頓號或逗號分隔）</label><input type="text" id="ed-relatedNotices" value="${escapeHtml(d.relatedNotices||'')}" placeholder="例：SOC-1140910-01、SOC-1140911-01"></div>
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
@@ -2270,6 +2382,7 @@ async function openEdit(kind, docId){
   }
   body.innerHTML=html;
   if(kind==='notice') initDropZone('ed-nfs-drop-zone','ed-nfs','ed-nfs-list');
+  if(kind==='duty'||kind==='notice') initRichEditor('ed-content','ed-content-tb');
   document.getElementById('modal-edit').classList.add('open');
 }
 
@@ -2322,7 +2435,8 @@ async function saveEdit(){
       payload.announcer=document.getElementById('ed-announcer')?.value?.trim()||'';
       payload.issuedDate=document.getElementById('ed-issuedDate')?.value||null;
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
-      payload.content=document.getElementById('ed-content')?.value||'';
+      payload.contentHtml=sanitizeRichHtml(document.getElementById('ed-content')?.innerHTML||'');
+      payload.content=stripHtmlToText(payload.contentHtml);
       localArr=window._dutyDocs; renderFn=renderDutyList;
     } else if(kind==='notice'){
       collectionName='notices';
@@ -2333,7 +2447,8 @@ async function saveEdit(){
       payload.expiryDate=document.getElementById('ed-expiryDate')?.value||null;
       payload.extended=document.getElementById('ed-extended')?.value==='1';
       payload.revised=document.getElementById('ed-revised')?.value==='1';
-      payload.content=document.getElementById('ed-content')?.value||'';
+      payload.contentHtml=sanitizeRichHtml(document.getElementById('ed-content')?.innerHTML||'');
+      payload.content=stripHtmlToText(payload.contentHtml);
       payload.relatedNotices=document.getElementById('ed-relatedNotices')?.value?.trim()||'';
       // 展延時自動記錄「第一次展延前」的原到期日，供清單對照顯示；若已有原到期日紀錄則保留，不會被後續展延覆蓋掉
       const existingNoticeData = (window._noticeDocs||[]).find(x=>x.id===docId);
@@ -2831,7 +2946,7 @@ async function autoFillNoticeFromPdf(input){
   window._noticeExtractedText = combinedText;
   // 通告內容欄位自動帶入
   const ncEl = document.getElementById('nc');
-  if (ncEl && !ncEl.value && combinedText) ncEl.value = extractNoticeContentFromText(combinedText);
+  if (ncEl && !ncEl.textContent.trim() && combinedText) ncEl.textContent = extractNoticeContentFromText(combinedText);
   if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位、':''}從 Word 檔帶入通告內容並擷取全文供搜尋（共 ${extractableFiles.length-failCount}/${extractableFiles.length} 個檔案，請確認內容有無多餘表格文字）${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${pdfCount?`　<span style="color:var(--ts)">（另有 ${pdfCount} 個PDF僅作為附件保存，不擷取全文）</span>`:''}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
 }
 
