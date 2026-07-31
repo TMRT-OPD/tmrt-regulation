@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 69</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 70</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -617,7 +617,7 @@ async function runSearch(kw){
       wantForm?getDocs(query(collection(window._db,'forms'), where('status','==','active'))):Promise.resolve({forEach:()=>{}})
     ]);
     let dutyMatches=[]; dutySnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])&&(!hideExpired||!isExpired(d))) dutyMatches.push({id:doc.id,...d});});
-    let noticeMatches=[]; noticeSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content])&&(!hideExpired||!isExpired(d))) noticeMatches.push({id:doc.id,...d});});
+    let noticeMatches=[]; noticeSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.unit===deptFilter)&&matchText([d.title,d.content,d.noticeNo])&&(!hideExpired||!isExpired(d))) noticeMatches.push({id:doc.id,...d});});
     let regMatches=[]; regSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.dept===deptFilter)&&matchText([d.title,d.docNo,d.fullText])) regMatches.push({id:doc.id,...d});});
     let formMatches=[]; formSnap.forEach(doc=>{const d=doc.data(); if((!deptFilter||d.dept===deptFilter)&&matchText([d.title,d.formNo,d.fullText])) formMatches.push({id:doc.id,...d});});
     // 排序：標題比對到的排最前面，其餘依內文比對排後面；同組再依日期新到舊排序
@@ -1057,7 +1057,7 @@ function renderNoticeList(){
     if(st.tab==='all'&&missingExpiry)return false;
     if(st.category&&d.category!==st.category)return false;
     if(extendedOnly&&!d.extended)return false;
-    if(!matchesAllKeywords([d.title,d.content],kw))return false;
+    if(!matchesAllKeywords([d.title,d.content,d.noticeNo],kw))return false;
     return true;
   });
   const sortVal=document.getElementById('notice-sort')?.value||'expiryDate-asc';
@@ -1073,7 +1073,7 @@ function renderNoticeList(){
         ${d.extended?'<span class="tag tag-extended" style="border-radius:14px">展延</span>':''}
         ${d.revised?'<span class="tag tag-revised" style="border-radius:14px">已修訂</span>':'<span class="tag tag-unrevised" style="border-radius:14px">未修訂</span>'}
       </div>
-      <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}${d.noticeNo?` <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(d.noticeNo)}）</span>`:''}</div>
+      <div style="font-size:13px;font-weight:500">${d.noticeNo?`<span style="display:inline-block;background:#e7f0fd;color:#1c5cb8;font-weight:700;font-size:12px;padding:1px 7px;border-radius:5px;margin-right:6px;vertical-align:middle">${highlightText(d.noticeNo,kw)}</span>`:''}${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<span style="text-decoration:line-through;color:var(--tt)">${d.originalExpiryDate}</span> → <b style="color:#8A5A00">${d.expiryDate||'—'}</b>`:(d.expiryDate||'—')}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}${d.relatedNotices?'　關聯通告：'+escapeHtml(d.relatedNotices):''}</div>
       ${renderContentBlock(d,kw)}
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
@@ -1333,7 +1333,7 @@ function pageUploadDuty(){return`<div class="ptitle">後臺控管 — 勤前上�
     <input type="file" id="dfs" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" style="display:none" onchange="showFiles(this,'dfl')">
     <div class="file-list" id="dfl"></div></div>
   <div class="info-box"><i class="ti ti-info-circle"></i>儲存後將同步至 Firestore，效期內勤前頁面即可查閱</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveDuty()"><i class="ti ti-check"></i> 儲存</button><button class="btn" onclick="clearForm(['dt','du','dc'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveDuty()"><i class="ti ti-check"></i> 儲存</button><button class="btn" onclick="clearDutyForm()"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="td-s"><div class="card">
   <div class="info-box"><i class="ti ti-info-circle"></i>系統可直接連線您的 Google Sheets 勤前指示總表，比對後將新資料批次匯入 Firestore。試算表標題列請包含：分類、事項內容（可用【標題】內文格式）、發布日期、到期日期、宣達者</div>
@@ -1359,7 +1359,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
     <div class="file-list" id="nfl"></div>
     <div id="notice-extract-status" style="font-size:12px;margin-top:6px;color:var(--ts)"></div></div>
   <div class="warn-box"><i class="ti ti-alert-triangle"></i>依公司規則管理辦法 2.2.3 條，通告有效期以不超過 6 個月為限，至多展延 1 次；分類會依「發布單位」自動判斷，不需另外選擇；「規章修訂狀態」已改為僅在編輯功能內設定</div>
-  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearForm(['nno','nt','nu','nc','nreg'])"><i class="ti ti-refresh"></i> 清除</button></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveNotice()"><i class="ti ti-check"></i> 發布通告</button><button class="btn" onclick="clearNoticeForm()"><i class="ti ti-refresh"></i> 清除</button></div>
 </div></div>
 <div class="tabpane" id="nb-b"><div class="card">
   <div class="info-box"><i class="ti ti-info-circle"></i>選擇整個資料夾（支援PDF與Word檔案），系統會逐一解析檔名（辨識通告編號、發布單位、生效日期、關聯規章編號），並擷取全文供日後搜尋使用（Word為文字型檔案時可直接擷取；PDF若為掃描件將自動改用OCR辨識，速度較慢）；辨識完可逐筆編輯修正，確認後才會送出；檔案將作為該筆通告的附件保存</div>
@@ -1549,7 +1549,7 @@ function pageEipCompare(){return`<div class="ptitle">後臺控管 — EIP公告�
 <div id="eip-result" style="margin-top:14px"><div class="pholder">貼上公告文字後點擊比對，比對結果將列於此處</div></div>`;}
 
 function parseEipItems(text){
-  const re = /(TMRT(?:-[A-Za-z]+|-\d+)+)([^\n(（]+?)[\(（](\d+)\s*版[\)）]/g;
+  const re = /^\s*(TMRT(?:-[A-Za-z]+|-\d+)+)([^\n]+?)[\(（](\d+)\s*版[\)）]/gm;
   const items = [];
   let m;
   while((m = re.exec(text))){
@@ -2089,6 +2089,24 @@ function switchTab(el,id){el.parentElement.querySelectorAll('.tab').forEach(t=>t
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function showFiles(input,listId){const list=document.getElementById(listId);if(!list)return;list.innerHTML='';Array.from(input.files).forEach(f=>{const item=document.createElement('div');item.className='file-item';item.innerHTML=`<i class="ti ti-file"></i><span>${f.name} (${(f.size/1024).toFixed(1)} KB)</span><button onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button>`;list.appendChild(item);});}
 function clearForm(ids){ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});}
+function clearDutyForm(){
+  ['dt','dann','df','de'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const dcat=document.getElementById('dcat'); if(dcat)dcat.value='';
+  const dc=document.getElementById('dc'); if(dc)dc.innerHTML='';
+  const dfs=document.getElementById('dfs'); if(dfs)dfs.value='';
+  const dfl=document.getElementById('dfl'); if(dfl)dfl.innerHTML='';
+}
+function clearNoticeForm(){
+  ['nno','nt','nreg','nf','ne'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const nu=document.getElementById('nu'); if(nu)nu.value='';
+  const nuOther=document.getElementById('nu-other'); if(nuOther){nuOther.value='';nuOther.style.display='none';}
+  const nx=document.getElementById('nx'); if(nx)nx.value='0';
+  const nc=document.getElementById('nc'); if(nc)nc.innerHTML='';
+  const nfs=document.getElementById('nfs'); if(nfs)nfs.value='';
+  const nfl=document.getElementById('nfl'); if(nfl)nfl.innerHTML='';
+  const status=document.getElementById('notice-extract-status'); if(status)status.innerHTML='';
+  window._noticeExtractedText='';
+}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2500);}
 
 function openChangePwd(){
@@ -2168,6 +2186,7 @@ async function saveDuty() {
     const dcEl = document.getElementById('dc'); if (dcEl) dcEl.innerHTML = '';
     ['df','de'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const dcatEl = document.getElementById('dcat'); if (dcatEl) dcatEl.value = '';
+    const dfsEl = document.getElementById('dfs'); if (dfsEl) dfsEl.value = '';
     const fl = document.getElementById('dfl'); if (fl) fl.innerHTML = '';
   } catch(e) {
     setBtnError(btn);
@@ -2220,6 +2239,7 @@ async function saveNotice() {
     const nuEl=document.getElementById('nu'); if(nuEl){nuEl.value='';toggleOtherUnit('nu');}
     const nuOther=document.getElementById('nu-other'); if(nuOther)nuOther.value='';
     ['nf','ne'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const nfsEl = document.getElementById('nfs'); if (nfsEl) nfsEl.value = '';
     const fl = document.getElementById('nfl'); if (fl) fl.innerHTML = '';
     const stEl = document.getElementById('notice-extract-status'); if (stEl) stEl.innerHTML = '';
   } catch(e) {
@@ -2336,6 +2356,7 @@ async function openEdit(kind, docId){
         <div><label class="fl2">規章修訂狀態</label><select id="ed-revised"><option value="0" ${!d.revised?'selected':''}>未修訂</option><option value="1" ${d.revised?'selected':''}>已修訂</option></select></div>
       </div>
       <div style="margin-bottom:12px"><label class="fl2">內容</label>${richToolbarHtml('ed-content-tb')}<div id="ed-content" class="rich-editor" contenteditable="true">${d.contentHtml||escapeHtml(d.content||'')}</div></div>
+      <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="ed-linkedRegulation" value="${escapeHtml(d.linkedRegulation||'')}" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
       <div style="margin-bottom:12px"><label class="fl2">關聯通告編號（選填，多筆可用頓號或逗號分隔）</label><input type="text" id="ed-relatedNotices" value="${escapeHtml(d.relatedNotices||'')}" placeholder="例：SOC-1140910-01、SOC-1140911-01"></div>
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
@@ -2450,6 +2471,7 @@ async function saveEdit(){
       payload.contentHtml=sanitizeRichHtml(document.getElementById('ed-content')?.innerHTML||'');
       payload.content=stripHtmlToText(payload.contentHtml);
       payload.relatedNotices=document.getElementById('ed-relatedNotices')?.value?.trim()||'';
+      payload.linkedRegulation=document.getElementById('ed-linkedRegulation')?.value?.trim()||'';
       // 展延時自動記錄「第一次展延前」的原到期日，供清單對照顯示；若已有原到期日紀錄則保留，不會被後續展延覆蓋掉
       const existingNoticeData = (window._noticeDocs||[]).find(x=>x.id===docId);
       if (existingNoticeData) {
@@ -3243,14 +3265,25 @@ async function handleNoticeBatchFiles(input){
         text = r.text || '';
       } catch(e) { extractError = e.message; }
     }
+    // 內文比檔名可靠（檔名常有簡化/誤植），若能從內文讀到通告編號格式，優先採用內文結果覆蓋檔名解析
+    let noticeNo = fnMeta.noticeNo, unit = fnMeta.unit, issuedDate = fnMeta.issuedDate, fromContent = false;
+    if (text) {
+      const cMatch = text.match(/([A-Za-z]{2,4})-(\d{6,7})-(\d{2,3})/);
+      if (cMatch) {
+        noticeNo = cMatch[0].toUpperCase();
+        unit = NOTICE_UNIT_CODE_MAP[cMatch[1].toUpperCase()] || unit;
+        issuedDate = parseCompactMinguoDate(cMatch[2]) || issuedDate;
+        fromContent = true;
+      }
+    }
     rows.push({
       file, text,
-      noticeNo: fnMeta.noticeNo,
-      unit: fnMeta.unit,
+      noticeNo, unit,
       title: fnMeta.title || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
-      issuedDate: fnMeta.issuedDate,
-      expiryDate: fnMeta.issuedDate ? addMonthsToDate(fnMeta.issuedDate, 6) : '',
+      issuedDate,
+      expiryDate: issuedDate ? addMonthsToDate(issuedDate, 6) : '',
       linkedRegulation: fnMeta.linkedRegulation,
+      _fromContent: fromContent,
       _extractError: extractError
     });
     area.innerHTML = `<div class="pholder">正在解析中…(${i+1}/${files.length})</div>`;
@@ -3267,7 +3300,7 @@ function renderNoticeBatchPreview(){
   const unitOpts = sel => '<option value="">請選擇</option>' + NOTICE_DEPTS.map(u=>`<option value="${u}" ${u===sel?'selected':''}>${u}</option>`).join('');
   const rowsHtml = rows.map((r,i)=>`<tr>
     <td>${escapeHtml(r.file.name)}${r._extractError?`<div style="color:#E24B4A;font-size:11px">全文擷取失敗（不影響欄位辨識與上傳）</div>`:''}${!r.noticeNo?`<div style="color:#856404;font-size:11px">檔名未辨識到通告編號，請人工確認</div>`:''}</td>
-    <td><input type="text" id="ntcb-no-${i}" value="${escapeHtml(r.noticeNo)}" style="min-width:130px" oninput="window._noticeBatchRows[${i}].noticeNo=this.value"></td>
+    <td><input type="text" id="ntcb-no-${i}" value="${escapeHtml(r.noticeNo)}" style="min-width:130px" oninput="window._noticeBatchRows[${i}].noticeNo=this.value">${r.noticeNo?`<div style="font-size:10px;color:${r._fromContent?'#27500A':'var(--ts)'};margin-top:2px">${r._fromContent?'✓ 來自內文（較可靠）':'來自檔名，請核對'}</div>`:''}</td>
     <td><select id="ntcb-unit-${i}" style="min-width:110px" onchange="window._noticeBatchRows[${i}].unit=this.value">${unitOpts(r.unit)}</select></td>
     <td><input type="text" id="ntcb-title-${i}" value="${escapeHtml(r.title)}" style="min-width:180px" oninput="window._noticeBatchRows[${i}].title=this.value"></td>
     <td><input type="date" id="ntcb-from-${i}" value="${r.issuedDate||''}" oninput="window._noticeBatchRows[${i}].issuedDate=this.value"></td>
@@ -3275,7 +3308,7 @@ function renderNoticeBatchPreview(){
     <td><input type="text" id="ntcb-reg-${i}" value="${escapeHtml(r.linkedRegulation)}" style="min-width:150px" oninput="window._noticeBatchRows[${i}].linkedRegulation=this.value"></td>
   </tr>`).join('');
   area.innerHTML = `
-    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，欄位依檔名解析（通告編號本身就藏著發布單位與生效日期），到期日期預設為生效日期+6個月，請逐筆檢查／修改後確認送出；分類會依發布單位自動判斷</div>
+    <div class="info-box"><i class="ti ti-info-circle"></i>共 ${rows.length} 份檔案，通告編號優先由Word內文讀取（較可靠），讀不到才退回用檔名解析；到期日期預設為生效日期+6個月，請逐筆檢查／修改後確認送出；分類會依發布單位自動判斷</div>
     <div class="card" style="padding:0;overflow:auto;max-height:420px">
       <table class="vtbl">
         <thead><tr><th>檔名</th><th>通告編號</th><th>發布單位</th><th>通告標題</th><th>生效日期</th><th>到期日期</th><th>關聯規章</th></tr></thead>
@@ -3452,9 +3485,18 @@ async function createNoticeFromListRow(idx){
 
 // ===== 批次補附件：讀取Word內文比對通告編號，補上附件並擷取全文 =====
 async function handleNoticeAttachFiles(input){
-  const files = Array.from(input.files || []).filter(f => f.name.toLowerCase().endsWith('.docx'));
+  const allFiles = Array.from(input.files || []);
+  const files = allFiles.filter(f => f.name.toLowerCase().endsWith('.docx'));
+  const oldDocFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.doc') && !f.name.toLowerCase().endsWith('.docx'));
   const area = document.getElementById('notice-attach-result');
-  if (files.length === 0) { area.innerHTML = '<div class="pholder">請選擇.docx檔案（此工具僅支援Word，PDF請用其他分頁上傳）</div>'; return; }
+  if (files.length === 0) {
+    if (oldDocFiles.length > 0) {
+      area.innerHTML = `<div class="pholder">偵測到 ${oldDocFiles.length} 份舊版 .doc 檔案（${oldDocFiles.map(f=>escapeHtml(f.name)).join('、')}）——此工具僅能讀取新版 .docx 格式的內文，.doc 是舊版二進位格式，瀏覽器端無法直接解析，請先用 Word 另存新檔為 .docx 後再上傳</div>`;
+    } else {
+      area.innerHTML = '<div class="pholder">請選擇.docx檔案（此工具僅支援Word，PDF請用其他分頁上傳）</div>';
+    }
+    return;
+  }
   area.innerHTML = `<div class="pholder">正在讀取內文並比對…(0/${files.length})</div>`;
   const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
   const snap = await getDocs(query(collection(window._db, 'notices'), where('status','==','active')));
