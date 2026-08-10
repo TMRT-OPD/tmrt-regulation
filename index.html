@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 70</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 71</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1075,6 +1075,7 @@ function renderNoticeList(){
       </div>
       <div style="font-size:13px;font-weight:500">${d.noticeNo?`<span style="display:inline-block;background:#e7f0fd;color:#1c5cb8;font-weight:700;font-size:12px;padding:1px 7px;border-radius:5px;margin-right:6px;vertical-align:middle">${highlightText(d.noticeNo,kw)}</span>`:''}${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.originalExpiryDate&&d.originalExpiryDate!==d.expiryDate?`<span style="text-decoration:line-through;color:var(--tt)">${d.originalExpiryDate}</span> → <b style="color:#8A5A00">${d.expiryDate||'—'}</b>`:(d.expiryDate||'—')}${d.unit?'　單位：'+d.unit:''}${d.linkedRegulation?'　關聯規章：'+d.linkedRegulation:''}${d.relatedNotices?'　關聯通告：'+escapeHtml(d.relatedNotices):''}</div>
+      ${d.revisionNote?`<div style="font-size:11px;color:var(--ts);margin-top:2px">修訂追蹤：${escapeHtml(d.revisionNote)}</div>`:''}
       ${renderContentBlock(d,kw)}
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
       ${lastUpdatedLine(d)}
@@ -1373,7 +1374,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div id="notice-batch-preview"></div>
 </div></div>
 <div class="tabpane" id="nb-l"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>上傳中心發布的通告清單（Excel），<b>可一次選取多個檔案</b>（例如站務中心通告清單+外單位通告清單、或今年+去年的清單一起比對），系統會逐一讀取（含檔案內多個工作表）並依「通告編號」比對資料庫，列出「已建置」與「尚未建置」的通告，尚未建置的可直接用清單資料一鍵建立（PDF/Word附件可之後再用編輯功能補上）；標題列須包含：發布單位、通告編號、通告名稱（或修正之規章/章/節或內容）、生效日期、失效日期；每次比對都是即時對照資料庫現況，不需保留舊清單，之後拿到新版清單直接重新上傳比對即可</div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>上傳中心發布的通告清單（Excel），<b>可一次選取多個檔案</b>（例如站務中心通告清單+外單位通告清單、或今年+去年的清單一起比對），系統會逐一讀取（含檔案內多個工作表）並依「通告編號」比對資料庫，列出「已建置」與「尚未建置」的通告，尚未建置的可直接用清單資料一鍵建立；清單裡的「修正之規章/章/節或內容」欄位是內部修訂追蹤備註，不是通告正文，會存成「修訂追蹤」欄位單獨顯示，通告的實際內容欄位會保持空白，PDF/Word附件與正文請之後用「批次補附件」或編輯功能補上；「相關通告索引」及備註欄若含其他通告編號（例如「重申SOC-xxx」）會自動抓出存入「關聯通告」；標題列須包含：發布單位、通告編號、通告名稱、生效日期、失效日期；每次比對都是即時對照資料庫現況，不需保留舊清單，之後拿到新版清單直接重新上傳比對即可</div>
   <div style="margin-bottom:12px">
     <div id="notice-list-drop-zone" class="upload-zone" onclick="document.getElementById('notice-list-file').click()"><i class="ti ti-file-spreadsheet"></i><span>點擊或將 Excel 清單拖曳至此處</span></div>
     <input type="file" id="notice-list-file" accept=".xlsx,.xls" multiple style="display:none" onchange="handleNoticeListFile(this)">
@@ -1381,7 +1382,7 @@ function pageUploadNotice(){return`<div class="ptitle">後臺控管 — 通告�
   <div id="notice-list-result"></div>
 </div></div>
 <div class="tabpane" id="nb-a"><div class="card">
-  <div class="info-box"><i class="ti ti-info-circle"></i>適用於：手上已有 Word 檔案，但檔名雜亂無法對應到通告編號的情況。系統會讀取每份 Word 的<b>內文</b>（通常表格裡有「編號」欄位），自動比對資料庫中已存在的通告，找到就補上附件並擷取全文；找不到的可手動輸入編號或略過，不影響其他筆</div>
+  <div class="info-box"><i class="ti ti-info-circle"></i>適用於：手上已有 Word 檔案，但檔名雜亂無法對應到通告編號的情況。系統會讀取每份 Word 的<b>內文</b>（通常表格裡有「編號」欄位），自動比對資料庫中已存在的通告，找到就補上附件並擷取全文；若該通告目前尚無內容（例如由清單比對匯入建立、還沒有正文的空白紀錄），會一併從這份 Word 帶入內容欄位，避免清單資料跟通告本體脫鉤；找不到的可手動輸入編號或略過，不影響其他筆</div>
   <div style="margin-bottom:12px">
     <div id="notice-attach-drop-zone" class="upload-zone" onclick="document.getElementById('notice-attach-files').click()"><i class="ti ti-upload"></i><span>點擊或將多個 Word 檔案拖曳至此處</span></div>
     <input type="file" id="notice-attach-files" accept=".docx" multiple style="display:none" onchange="handleNoticeAttachFiles(this)">
@@ -2357,6 +2358,7 @@ async function openEdit(kind, docId){
       </div>
       <div style="margin-bottom:12px"><label class="fl2">內容</label>${richToolbarHtml('ed-content-tb')}<div id="ed-content" class="rich-editor" contenteditable="true">${d.contentHtml||escapeHtml(d.content||'')}</div></div>
       <div style="margin-bottom:12px"><label class="fl2">關聯規章文件編號（選填）</label><input type="text" id="ed-linkedRegulation" value="${escapeHtml(d.linkedRegulation||'')}" placeholder="例：TMRT-SOC-OPD-0-1001"></div>
+      <div style="margin-bottom:12px"><label class="fl2">修訂追蹤備註（選填，例如「預計修訂於OO說明書-N版」）</label><input type="text" id="ed-revisionNote" value="${escapeHtml(d.revisionNote||'')}" placeholder="來自傳簽清單的修正之規章/章/節或內容欄位"></div>
       <div style="margin-bottom:12px"><label class="fl2">關聯通告編號（選填，多筆可用頓號或逗號分隔）</label><input type="text" id="ed-relatedNotices" value="${escapeHtml(d.relatedNotices||'')}" placeholder="例：SOC-1140910-01、SOC-1140911-01"></div>
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
@@ -2472,6 +2474,7 @@ async function saveEdit(){
       payload.content=stripHtmlToText(payload.contentHtml);
       payload.relatedNotices=document.getElementById('ed-relatedNotices')?.value?.trim()||'';
       payload.linkedRegulation=document.getElementById('ed-linkedRegulation')?.value?.trim()||'';
+      payload.revisionNote=document.getElementById('ed-revisionNote')?.value?.trim()||'';
       // 展延時自動記錄「第一次展延前」的原到期日，供清單對照顯示；若已有原到期日紀錄則保留，不會被後續展延覆蓋掉
       const existingNoticeData = (window._noticeDocs||[]).find(x=>x.id===docId);
       if (existingNoticeData) {
@@ -3394,23 +3397,31 @@ async function handleNoticeListFile(input){
         const cContent = findCol(headerRow, ['修正之規章','內容']);
         const cFrom = findCol(headerRow, ['生效日期']);
         const cTo = findCol(headerRow, ['失效日期','有效期限']);
+        const cRelated = findCol(headerRow, ['相關通告索引','相關通告']);
         const cNote = findCol(headerRow, ['備註']);
+        const noticeCiteRe = /([A-Za-z]{2,4}-\d{6,7}-\d{2,3})/g;
         for (let i=headerIdx+1; i<aoa.length; i++) {
           const row = aoa[i];
           if (!row || row.every(c => String(c).trim()==='')) continue;
           const noticeNo = cNo>=0 ? String(row[cNo]||'').trim() : '';
           if (!noticeNo) continue;
-          const contentRaw = cContent>=0 ? String(row[cContent]||'').trim() : '';
-          const regMatch = contentRaw.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+          const revisionNote = cContent>=0 ? String(row[cContent]||'').trim() : '';
+          const regMatch = revisionNote.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+          const noteRaw = cNote>=0 ? String(row[cNote]||'').trim() : '';
+          const relatedRaw = cRelated>=0 ? String(row[cRelated]||'').trim() : '';
+          // 相關通告索引欄位與備註欄位都可能夾帶「重申SOC-xxx」這類通告編號引用，兩邊都抓，去重後合併
+          const relatedSet = new Set();
+          [relatedRaw, noteRaw].forEach(s => { const ms = s.match(noticeCiteRe); if (ms) ms.forEach(x => { if (x.toUpperCase()!==noticeNo.toUpperCase()) relatedSet.add(x.toUpperCase()); }); });
           rows.push({
             noticeNo,
             unit: cUnit>=0 ? String(row[cUnit]||'').trim() : '',
             title: cTitle>=0 ? String(row[cTitle]||'').trim() : '',
-            content: contentRaw,
+            revisionNote,
             issuedDate: cFrom>=0 ? parseMinguoDate(String(row[cFrom]||'').trim()) : '',
             expiryDate: cTo>=0 ? parseMinguoDate(String(row[cTo]||'').trim()) : '',
             linkedRegulation: regMatch ? regMatch[0].toUpperCase() : '',
-            note: cNote>=0 ? String(row[cNote]||'').trim() : '',
+            relatedNotices: Array.from(relatedSet).join('、'),
+            note: noteRaw,
             sourceFile: file.name + (wb.SheetNames.length>1?`（${sheetName}）`:'')
           });
         }
@@ -3448,7 +3459,8 @@ function renderNoticeListResult(){
       const idx = rows.indexOf(r);
       return `<div class="list-card" style="border-left-color:#856404">
         <div style="font-size:13px;font-weight:600">${escapeHtml(r.title||'（無標題）')} <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(r.noticeNo)}）</span></div>
-        <div style="font-size:12px;color:var(--ts);margin-top:6px">發布單位：${escapeHtml(r.unit||'—')}　生效：${r.issuedDate||'—'}　失效：${r.expiryDate||'—'}${r.note?'　備註：'+escapeHtml(r.note):''}${r.sourceFile?`　<span style="color:var(--tt)">來源：${escapeHtml(r.sourceFile)}</span>`:''}</div>
+        <div style="font-size:12px;color:var(--ts);margin-top:6px">發布單位：${escapeHtml(r.unit||'—')}　生效：${r.issuedDate||'—'}　失效：${r.expiryDate||'—'}${r.relatedNotices?'　關聯通告：'+escapeHtml(r.relatedNotices):''}${r.note?'　備註：'+escapeHtml(r.note):''}${r.sourceFile?`　<span style="color:var(--tt)">來源：${escapeHtml(r.sourceFile)}</span>`:''}</div>
+        ${r.revisionNote?`<div style="font-size:12px;color:var(--ts);margin-top:4px">修訂追蹤：${escapeHtml(r.revisionNote)}</div>`:''}
         <div style="margin-top:8px"><button class="btn btn-sm btn-primary" onclick="createNoticeFromListRow(${idx})"><i class="ti ti-plus"></i> 用此資料建立通告</button></div>
       </div>`;
     }).join('') : '<div class="info-box"><i class="ti ti-circle-check"></i>清單裡的通告全部都已建置</div>'}
@@ -3458,7 +3470,7 @@ function renderNoticeListResult(){
 async function createNoticeFromListRow(idx){
   const r = (window._noticeListRows||[])[idx];
   if (!r) return;
-  if (!confirm(`確定要用清單資料建立這筆通告嗎？\n「${r.title}」（${r.noticeNo}）\n\n建立後尚無附件，之後請用編輯功能或重新上傳補上PDF/Word檔案。`)) return;
+  if (!confirm(`確定要用清單資料建立這筆通告嗎？\n「${r.title}」（${r.noticeNo}）\n\n會建立標題/日期/修訂追蹤等基本資料，內容欄位保持空白、尚無附件，之後請用「批次補附件」或編輯功能補上PDF/Word檔案（附上後會自動帶入內容）。`)) return;
   try {
     const {collection, addDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const newRef = await addDoc(collection(window._db, 'notices'), {
@@ -3469,7 +3481,9 @@ async function createNoticeFromListRow(idx){
       issuedDate: r.issuedDate || null,
       expiryDate: r.expiryDate || null,
       extended: false, revised: false,
-      content: r.content || '',
+      content: '',
+      revisionNote: r.revisionNote || '',
+      relatedNotices: r.relatedNotices || '',
       linkedRegulation: r.linkedRegulation || '',
       attachments: [], fullText: '', status: 'active',
       createdAt: serverTimestamp(), createdBy: window._uid, importedFromList: true
@@ -3569,7 +3583,10 @@ async function applyNoticeAttach(i){
     const url = await uploadFile(r.file, `notices/${new Date().getFullYear()}/${Date.now()}_${r.file.name}`);
     const attachments = [...(cur.attachments||[]), {name: r.file.name, url, size: r.file.size}];
     const fullText = cur.fullText ? cur.fullText+'\n\n'+r.text : r.text;
-    await updateDoc(doc(window._db, 'notices', r.matchedId), {attachments, fullText, updatedAt: serverTimestamp(), updatedBy: window._uid});
+    const updates = {attachments, fullText, updatedAt: serverTimestamp(), updatedBy: window._uid};
+    // 若通告目前尚無內容（例如清單比對匯入建立的空白紀錄），從這次附上的Word內文帶入，避免清單顯示跟通告本體始終脫鉤
+    if (!cur.content) updates.content = extractNoticeContentFromText(r.text);
+    await updateDoc(doc(window._db, 'notices', r.matchedId), updates);
     await logActivity('notice','update',r.matchedId,r.matchedTitle,'批次補附件（依內文比對）',cur.unit);
     r.applied = true;
     renderNoticeAttachResult();
