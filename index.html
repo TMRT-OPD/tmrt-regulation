@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 71</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 72</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2363,9 +2363,10 @@ async function openEdit(kind, docId){
       <div style="margin-bottom:12px"><label class="fl2">附件</label>
         <div class="file-list" id="ed-att-list">${attList||'<div style="font-size:12px;color:var(--ts)">目前無附件</div>'}</div>
         <div id="ed-nfs-drop-zone" class="upload-zone" style="margin-top:8px" onclick="document.getElementById('ed-nfs').click()"><i class="ti ti-upload"></i><span>點擊或將檔案拖曳至此處（可一次選多個檔案，例如同時上傳Word文字版＋簽核用PDF）</span></div>
-        <input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list')">
+        <input type="file" id="ed-nfs" multiple accept=".pdf,.doc,.docx,.png,.jpg" style="display:none" onchange="showFiles(this,'ed-nfs-list');autoFillEditContentFromWord(this)">
         <div class="file-list" id="ed-nfs-list" style="margin-top:6px"></div>
-        <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若要整份取代舊附件，先移除舊附件再新增</div>
+        <div id="ed-nfs-status" style="font-size:11px;color:var(--ts);margin-top:4px"></div>
+        <div style="font-size:11px;color:var(--ts);margin-top:4px">新增的附件會自動擷取全文並加進搜尋索引；若內容欄位目前是空的，新增 Word 附件時會自動帶入內容；若要整份取代舊附件，先移除舊附件再新增</div>
       </div>
       <div class="info-box"><i class="ti ti-info-circle"></i>分類會依「發布單位」自動判斷，不需另外選擇；若此通告是為了展延其他通告的效期，請直接編輯「被展延的原始通告」本身——把「是否展延」切為是，到期日期會自動延後6個月（可再自行調整），系統才會正確判斷效期；本則展延公告可用「關聯通告編號」註記關聯</div>`;
   } else if(kind==='regulation'){
@@ -2975,7 +2976,39 @@ async function autoFillNoticeFromPdf(input){
   if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta.noticeNo?'從檔名帶入欄位、':''}從 Word 檔帶入通告內容並擷取全文供搜尋（共 ${extractableFiles.length-failCount}/${extractableFiles.length} 個檔案，請確認內容有無多餘表格文字）${fnMeta.noticeNo?'':'，惟檔名未能辨識出通告編號，請手動確認/填寫欄位'}${pdfCount?`　<span style="color:var(--ts)">（另有 ${pdfCount} 個PDF僅作為附件保存，不擷取全文）</span>`:''}${anyTruncated?'　<span style="color:#856404">（部分文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響上傳）</span>`:''}`;
 }
 
-// ===== 批次上傳：規章 =====
+// 編輯通告時拖入 Word 檔案，若內容欄位目前是空的，自動擷取內文帶入（行為對齊新增通告，但不覆蓋已填寫的內容/標題/日期等欄位）
+async function autoFillEditContentFromWord(input){
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
+  const st = document.getElementById('ed-nfs-status');
+  const ncEl = document.getElementById('ed-content');
+  if (!ncEl) return;
+  const alreadyHasContent = !!ncEl.textContent.trim();
+  const extractableFiles = files.filter(f => isNoticeExtractableFile(f.name));
+  if (extractableFiles.length === 0) return;
+  if (alreadyHasContent) {
+    if (st) st.innerHTML = '<span style="color:var(--ts)">內容欄位已有資料，未自動覆蓋；如需改用附件內文，請先清空內容欄位再重新拖入</span>';
+    return;
+  }
+  if (st) st.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在從 Word 檔擷取內文帶入內容欄位…`;
+  let combinedText = '';
+  let anyTruncated = false, failCount = 0;
+  for (const file of extractableFiles) {
+    try {
+      const {text, truncated} = await extractFileText(file, 500);
+      if (text && text.trim()) combinedText += (combinedText?'\n\n':'') + (extractableFiles.length>1?`【來源檔案：${file.name}】\n`:'') + text;
+      if (truncated) anyTruncated = true;
+    } catch(e) {
+      failCount++;
+      console.warn(`擷取「${file.name}」失敗：`, e);
+    }
+  }
+  if (combinedText) ncEl.textContent = extractNoticeContentFromText(combinedText);
+  if (st) st.innerHTML = combinedText
+    ? `<i class="ti ti-check" style="color:#27500A"></i> 已從 Word 檔帶入內容（請確認有無多餘表格文字）${anyTruncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁）</span>':''}${failCount?`　<span style="color:#E24B4A">（${failCount}個檔案擷取失敗，不影響附件上傳）</span>`:''}`
+    : '<span style="color:#856404">Word 檔內文為空或擷取失敗，內容欄位未變動</span>';
+}
+
 async function handleRegBatchFiles(input){
   const files = Array.from(input.files || []).filter(f => f.name.toLowerCase().endsWith('.pdf'));
   const area = document.getElementById('reg-batch-preview');
