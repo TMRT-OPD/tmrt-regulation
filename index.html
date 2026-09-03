@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 75</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 76</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -2941,6 +2941,7 @@ async function autoFillRegFromPdf(input){
     const rt = document.getElementById('rt'); if (rt && !rt.value && fnMeta.title) rt.value = fnMeta.title;
     const rv = document.getElementById('rv'); if (rv && !rv.value && fnMeta.version) rv.value = fnMeta.version;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && fnMeta.dept) rdept.value = fnMeta.dept;
+    const rtier0 = document.getElementById('rtier'); if (rtier0 && fnMeta.tier) rtier0.value = fnMeta.tier;
   }
   if (st) st.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> 正在擷取全文並辨識欄位（若為掃描件將自動改用OCR辨識，速度會較慢）…';
   try {
@@ -2954,6 +2955,7 @@ async function autoFillRegFromPdf(input){
     const rv = document.getElementById('rv'); if (rv && !rv.value && meta.version) rv.value = meta.version;
     const rdate = document.getElementById('rdate'); if (rdate && !rdate.value && meta.approvedDate) rdate.value = meta.approvedDate;
     const rdept = document.getElementById('rdept'); if (rdept && !rdept.value && meta.dept) rdept.value = meta.dept;
+    const rtier = document.getElementById('rtier'); if (rtier && meta.tier) rtier.value = meta.tier;
     const finalDocNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
     if (st) st.innerHTML = `<i class="ti ti-check" style="color:#27500A"></i> 已${fnMeta&&fnMeta.docNo?'從檔名＋':''}擷取全文並自動帶入可辨識欄位，請確認內容無誤${finalDocNo?'':'（未辨識到文件編號，請手動輸入）'}${truncated?'　<span style="color:#856404">（文件超過500頁，僅擷取前500頁全文）</span>':''}${usedOCR?'　<span style="color:#856404">（此文件為掃描件，已自動使用OCR辨識，準確度僅供搜尋參考，欄位請務必人工核對）</span>':''}`;
   } catch(e) {
@@ -3100,23 +3102,25 @@ async function handleRegBatchFiles(input){
         area.innerHTML = `<div class="pholder">正在擷取全文並辨識中…(檔案 ${i+1}/${files.length}：${escapeHtml(file.name)}，第 ${pi}/${pn} 頁${ptotal>pn?`，共${ptotal}頁`:''})</div>`;
       });
       const meta = extractDocMetaFromText(text, file.name);
+      const docNo = (fnMeta&&fnMeta.docNo) || meta.docNo;
       row = {
         file, text,
-        docNo: (fnMeta&&fnMeta.docNo) || meta.docNo,
+        docNo,
         title: (fnMeta&&fnMeta.title) || meta.title,
         dept: (fnMeta&&fnMeta.dept) || meta.dept,
         version: (fnMeta&&fnMeta.version) || meta.version || '',
         approvedDate: meta.approvedDate,
-        tier: '2'
+        tier: deriveTierFromDocNo(docNo) || '2'
       };
     } catch(e) {
+      const docNo = (fnMeta&&fnMeta.docNo) || '';
       row = {
         file, text: '',
-        docNo: (fnMeta&&fnMeta.docNo) || '',
+        docNo,
         title: (fnMeta&&fnMeta.title) || file.name.replace(/\.[a-zA-Z0-9]+$/,''),
         dept: (fnMeta&&fnMeta.dept) || '',
         version: (fnMeta&&fnMeta.version) || '',
-        approvedDate: '', tier: '2', _extractError: e.message
+        approvedDate: '', tier: deriveTierFromDocNo(docNo) || '2', _extractError: e.message
       };
     }
     // 掃描階段同時判斷狀態，供畫面列出讓使用者逐筆確認，不在此階段寫入資料庫
@@ -4200,6 +4204,14 @@ function normalizeExtractedText(text){
 function flexLabel(label){
   return label.split('').map(c=>c.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s*');
 }
+// 流水號開頭第一碼即為文件位階（1→第一階、2→第二階、3→第三階、4→第四階），與部門/類別代碼段數無關，任何格式的文件編號都適用
+function deriveTierFromDocNo(docNo){
+  if(!docNo) return '';
+  const m = docNo.match(/-(\d{3,5})$/);
+  if(!m) return '';
+  const first = m[1][0];
+  return ['1','2','3','4'].includes(first) ? first : '';
+}
 // 從檔名直接解析文件編號／名稱／版次（許多表單本身就是Word/Excel，沒有PDF全文可讀，檔名反而是最可靠來源）
 // 支援格式如：TMRT-ISD-GEN-0-4001職業災害速報表(2版).docx
 function extractMetaFromFilename(fileName){
@@ -4218,7 +4230,8 @@ function extractMetaFromFilename(fileName){
   }
   const title = rest.replace(/^[_\s\(（]+|[_\s\)）]+$/g, '').trim();
   const dept = resolveDeptPathFromDocNo(docNo);
-  return {docNo, title, version, dept};
+  const tier = deriveTierFromDocNo(docNo);
+  return {docNo, title, version, dept, tier};
 }
 
 function extractDocMetaFromText(text, fileName){
@@ -4227,6 +4240,7 @@ function extractDocMetaFromText(text, fileName){
   const docNoMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i) || compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-[A-Z]{2,6}-\d{3,5}/i);
   const docNo = docNoMatch ? docNoMatch[0].toUpperCase() : '';
   const dept = docNo ? resolveDeptPathFromDocNo(docNo) : '';
+  const tier = docNo ? deriveTierFromDocNo(docNo) : '';
   const verMatch = norm.match(new RegExp(flexLabel('版次')+'[:：]?\\s*([0-9]+)'));
   const version = verMatch ? verMatch[1] : '';
   const dateMatch = norm.match(new RegExp(flexLabel('核決日期')+'[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
@@ -4234,7 +4248,7 @@ function extractDocMetaFromText(text, fileName){
   const titleMatch = norm.match(new RegExp(flexLabel('文件名稱')+'[:：]?\\s*([\\s\\S]{2,50}?)(?=\\s*'+flexLabel('文件編號')+'|\\s*'+flexLabel('訂定日期')+'|\\s*'+flexLabel('核決日期')+'|$)'));
   let title = titleMatch ? titleMatch[1].trim() : '';
   if(!title) title = fileName.replace(/\.[a-zA-Z0-9]+$/,'');
-  return {docNo, dept, version, approvedDate, title};
+  return {docNo, dept, tier, version, approvedDate, title};
 }
 
 async function importFromSheets(){
