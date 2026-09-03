@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 74</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 75</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -702,7 +702,7 @@ function renderSearchItem(d,kind,kw){
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">發布：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
-      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.content||"")}, "", "", "duty_briefs", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
+      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.content||"")}, "", "", "duty_briefs", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
     </div>`;
   } else if(kind==='notice'){
     const cat=NOTICE_CATEGORIES.find(c=>c.id===d.category);
@@ -713,21 +713,21 @@ function renderSearchItem(d,kind,kw){
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)}</div>
       <div style="font-size:11px;color:var(--ts);margin-top:4px">生效：${d.issuedDate||'—'}　到期：${d.expiryDate||'—'}</div>
       ${d.content?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.content,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
-      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.content||"")}, "", "", "notices", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
+      ${d.content?`<div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.content||"")}, "", "", "notices", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>`:''}
     </div>`;
   } else if(kind==='regulation'){
     const n=countMatches(d.fullText,kw);
     return `<div class="list-card" style="border-left-color:var(--ti)">
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)} <span style="font-weight:400;color:var(--ts);font-size:11px">（${d.docNo||'—'}）</span></div>
       ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
-      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
+      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, "regulations", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
     </div>`;
   } else if(kind==='form'){
     const n=countMatches(d.fullText,kw);
     return `<div class="list-card" style="border-left-color:var(--ti)">
       <div style="font-size:13px;font-weight:500">${highlightText(d.title||'—',kw)} <span style="font-weight:400;color:var(--ts);font-size:11px">（${d.formNo||'—'}）</span></div>
       ${d.fullText?`<div style="font-size:12px;color:var(--ts);margin-top:6px">${highlightText(snippetOf(d.fullText,kw),kw)}${n>1?`<span style="color:var(--ti);margin-left:6px;font-size:11px">（內文共 ${n} 處符合）</span>`:''}</div>`:''}
-      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
+      <div style="margin-top:8px"><button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, "forms", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button></div>
     </div>`;
   }
   return '';
@@ -773,6 +773,10 @@ function getUnitValue(id){
   return sel.value;
 }
 function escapeHtml(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// JSON.stringify()產生的字串本身可能夾帶原始單引號（例如PDF/OCR全文、標題、搜尋關鍵字裡剛好有一個單引號），
+// 塞進用單引號包住的 onclick 屬性時會把屬性提前截斷，後面內容變成外露的純文字。此函式在JSON化後
+// 把單引號轉成HTML實體，瀏覽器解析屬性時會先解碼實體、再交給JS解析，字串內容不受影響但不會截斷屬性。
+function jsAttr(v){ return JSON.stringify(v==null?'':v).replace(/'/g,'&#39;'); }
 function renderWatermark(empId, name){
   const el = document.getElementById('watermark-overlay');
   if (!el) return;
@@ -1056,8 +1060,8 @@ function renderDutyList(){
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
       ${lastUpdatedLine(d)}
       ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
-        <button class="btn btn-sm" onclick='openEdit("duty",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
-        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDutyItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+        <button class="btn btn-sm" onclick='openEdit("duty",${jsAttr(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDutyItem(${jsAttr(d.id)},${jsAttr(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
       </div>`:''}
     </div>`;
   }).join('');
@@ -1118,8 +1122,8 @@ function renderNoticeList(){
       ${(()=>{const va=visibleAttachments(d.attachments);return va.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${va.map(a=>`<a href="${a.url}" target="_blank" class="btn btn-sm"><i class="ti ti-paperclip"></i> ${a.name}</a>`).join('')}</div>`:'';})()}
       ${lastUpdatedLine(d)}
       ${(window._level==='S'||window._level==='A')?`<div style="margin-top:8px;display:flex;gap:6px">
-        <button class="btn btn-sm" onclick='openEdit("notice",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
-        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteNoticeItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+        <button class="btn btn-sm" onclick='openEdit("notice",${jsAttr(d.id)})'><i class="ti ti-edit"></i> 編輯</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteNoticeItem(${jsAttr(d.id)},${jsAttr(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
       </div>`:''}
     </div>`;
   }).join('');
@@ -1174,7 +1178,7 @@ async function loadReadmeReg() {
           <div style="font-size:11px;color:var(--color-text-secondary, #6b6b67);margin-top:2px">版次 ${d.version||'—'} ／ 核決日期：${d.approvedDate||'—'} ／ ${d.fileName||''} (${d.fileSize ? (d.fileSize/1024).toFixed(0)+'KB' : ''})</div>
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-primary btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(docId||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
+          <button class="btn btn-primary btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, "regulations", ${jsAttr(docId||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
           ${(window._level==='S'||window._level==='A')?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
         </div>
       </div>`;
@@ -1255,11 +1259,11 @@ function renderRegList(){
     <td>版次 ${d.version||'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
-      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "regulations", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
+      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, "regulations", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.docNo ? `<button class="btn btn-sm" onclick="showVersionHistory('regulations','docNo','${d.docNo}','${escapeHtml(d.title||d.docNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
-      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("regulation",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
-      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteRegItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("regulation",${jsAttr(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
+      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteRegItem(${jsAttr(d.id)},${jsAttr(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`;
   }).join('');
@@ -1344,11 +1348,11 @@ function renderFormList(){
     <td>${d.version?('版次 '+escapeHtml(d.version)):'—'}</td>
     <td>${d.approvedDate||'—'}</td>
     <td style="display:flex;gap:6px;flex-wrap:wrap">
-      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, "forms", ${JSON.stringify(d.id||"")}, ${JSON.stringify(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
+      ${d.fileUrl ? `<button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, "forms", ${jsAttr(d.id||"")}, ${jsAttr(kw)})'><i class="ti ti-file-text"></i> 查閱全文</button>` : ''}
       ${(d.fileUrl&&(window._level==='S'||window._level==='A')) ? `<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>` : ''}
       ${d.formNo ? `<button class="btn btn-sm" onclick="showVersionHistory('forms','formNo','${d.formNo}','${escapeHtml(d.title||d.formNo)}')"><i class="ti ti-history"></i> 歷史版本</button>` : ''}
-      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("form",${JSON.stringify(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
-      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteFormItem(${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+      ${(window._level==='S'||window._level==='A')?`<button class="btn btn-sm" onclick='openEdit("form",${jsAttr(d.id)})'><i class="ti ti-edit"></i> 編輯</button>`:''}
+      ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteFormItem(${jsAttr(d.id)},${jsAttr(d.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
     </td>
   </tr>`;
   }).join('');
@@ -1715,8 +1719,8 @@ async function loadOrphanCheck(){
       ${o.suggested?`<div style="font-size:12px;color:#27500A;margin-top:4px">依文件編號建議改為：<b>${escapeHtml(o.suggested)}</b></div>`:`<div style="font-size:12px;color:#856404;margin-top:4px">無法從文件編號自動判斷正確分類，請手動指定</div>`}
       <div style="margin-top:8px;display:flex;gap:6px">
         ${o.suggested?`<button class="btn btn-sm btn-primary" onclick="applyOrphanSuggestion(${i})"><i class="ti ti-check"></i> 套用建議分類</button>`:''}
-        <button class="btn btn-sm" onclick='openEdit(${JSON.stringify(o.kind)},${JSON.stringify(o.id)})'><i class="ti ti-edit"></i> 手動重新指定</button>
-        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteOrphanItem(${JSON.stringify(o.kind)},${JSON.stringify(o.id)},${JSON.stringify(o.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
+        <button class="btn btn-sm" onclick='openEdit(${jsAttr(o.kind)},${jsAttr(o.id)})'><i class="ti ti-edit"></i> 手動重新指定</button>
+        ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteOrphanItem(${jsAttr(o.kind)},${jsAttr(o.id)},${jsAttr(o.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
       </div>
     </div>`).join('');
   } catch(e) {
@@ -1802,13 +1806,13 @@ async function loadDupCheck(){
     area.innerHTML = `<div class="info-box" style="margin-bottom:10px"><i class="ti ti-alert-triangle"></i>共發現 ${allGroups.length} 組編號存在名稱不一致的情況——如果是<b>重新上傳時檔名微調用字</b>造成的重複，請確認保留哪一筆、刪除其餘的；如果是<b>刻意拆分成多份獨立文件</b>（例如同編號但故意拆成不同章節各自維護），可以標記為刻意拆分，之後就不會再提醒</div>` + allGroups.map(g => `<div class="list-card" style="border-left-color:#856404">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="font-size:13px;font-weight:600">${escapeHtml(g.items[0].label)}｜編號 ${escapeHtml(g.num)}（共 ${g.items.length} 筆名稱不同）</div>
-        ${window._level==='S'||window._level==='A'?`<button class="btn btn-sm" onclick='markGroupIgnored(${JSON.stringify(g.kind)},${JSON.stringify(g.num)})'><i class="ti ti-checkbox"></i> 標記為刻意拆分，不再提醒</button>`:''}
+        ${window._level==='S'||window._level==='A'?`<button class="btn btn-sm" onclick='markGroupIgnored(${jsAttr(g.kind)},${jsAttr(g.num)})'><i class="ti ti-checkbox"></i> 標記為刻意拆分，不再提醒</button>`:''}
       </div>
       ${g.items.map(it => `<div style="margin-top:8px;padding:8px 10px;background:var(--ct);border-radius:var(--rs)">
         <div style="font-size:12.5px">${escapeHtml(it.title||'—')} <span style="color:var(--ts);font-size:11px">（版次 ${escapeHtml(it.version||'—')}　核決日期 ${it.approvedDate||'—'}　所屬處室 ${escapeHtml(it.dept||'—')}）</span></div>
         <div style="margin-top:6px;display:flex;gap:6px">
-          <button class="btn btn-sm" onclick='openEdit(${JSON.stringify(it.kind)},${JSON.stringify(it.id)})'><i class="ti ti-edit"></i> 編輯</button>
-          ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDupItem(${JSON.stringify(it.kind)},${JSON.stringify(it.id)},${JSON.stringify(it.title||"")})'><i class="ti ti-trash"></i> 刪除此筆</button>`:''}
+          <button class="btn btn-sm" onclick='openEdit(${jsAttr(it.kind)},${jsAttr(it.id)})'><i class="ti ti-edit"></i> 編輯</button>
+          ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteDupItem(${jsAttr(it.kind)},${jsAttr(it.id)},${jsAttr(it.title||"")})'><i class="ti ti-trash"></i> 刪除此筆</button>`:''}
         </div>
       </div>`).join('')}
     </div>`).join('');
@@ -2736,9 +2740,9 @@ async function showVersionHistory(collectionName, field, value, displayTitle){
         </div>
         <div style="font-size:12px;color:var(--ts)">核決日期：${d.approvedDate||'—'}${d.fileName?'　檔名：'+escapeHtml(d.fileName):''}</div>
         <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="btn btn-sm" onclick='showFullText(${JSON.stringify(d.title||"")}, ${JSON.stringify(d.fullText||"")}, ${JSON.stringify(d.fileUrl||"")}, ${JSON.stringify(d.fileName||"")}, ${JSON.stringify(collectionName)}, ${JSON.stringify(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
+          <button class="btn btn-sm" onclick='showFullText(${jsAttr(d.title||"")}, ${jsAttr(d.fullText||"")}, ${jsAttr(d.fileUrl||"")}, ${jsAttr(d.fileName||"")}, ${jsAttr(collectionName)}, ${jsAttr(d.id||"")})'><i class="ti ti-file-text"></i> 查閱全文</button>
           ${(d.fileUrl&&(window._level==='S'||window._level==='A'))?`<a href="${d.fileUrl}" download="${d.fileName||''}" class="btn btn-sm"><i class="ti ti-download"></i> 下載</a>`:''}
-          ${(!isActive&&window._level==='S')?`<button class="btn btn-sm" style="color:#8A5A00" onclick='restoreSupersededVersion(${JSON.stringify(collectionName)},${JSON.stringify(d.id)},${JSON.stringify(d.title||"")})'><i class="ti ti-arrow-back-up"></i> 恢復為有效版本</button>`:''}
+          ${(!isActive&&window._level==='S')?`<button class="btn btn-sm" style="color:#8A5A00" onclick='restoreSupersededVersion(${jsAttr(collectionName)},${jsAttr(d.id)},${jsAttr(d.title||"")})'><i class="ti ti-arrow-back-up"></i> 恢復為有效版本</button>`:''}
         </div>
       </div>`;
     }).join('');
@@ -2777,7 +2781,7 @@ function showFullText(title, fullText, fileUrl, fileName, collectionName, docId,
     const canAccessFile = (window._level==='S'||window._level==='A');
     const pdfLink = (fileUrl && canAccessFile) ? `<div style="margin-bottom:10px"><a href="${fileUrl}" target="_blank" class="btn btn-sm"><i class="ti ti-file-type-pdf"></i> 開啟原始檔案（查看完整排版／表格／簽核）</a></div>` : '';
     const canReextract = canAccessFile && collectionName && docId && fileUrl && fileName && isReextractableFile(fileName);
-    const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${JSON.stringify(collectionName)},${JSON.stringify(docId)},${JSON.stringify(fileUrl)},${JSON.stringify(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
+    const reextractBtn = canReextract ? `<button class="btn btn-sm" style="margin-top:10px" onclick='reextractFullText(${jsAttr(collectionName)},${jsAttr(docId)},${jsAttr(fileUrl)},${jsAttr(fileName)})'><i class="ti ti-refresh"></i> ${fullText&&fullText.trim()?'重新擷取全文（更新排版）':'從原始檔案重新擷取全文'}</button>` : '';
     const hasKw = kw && String(kw).trim();
     const matchCount = (hasKw && fullText) ? countMatches(fullText, kw) : 0;
     const navBar = (hasKw && matchCount>0) ? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;font-size:12px;color:var(--ts);background:#fff8e1;border:0.5px solid #f0e0a0;border-radius:var(--rs);padding:6px 10px">
