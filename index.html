@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 73</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 74</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -381,7 +381,7 @@ function resolveDeptPathFromDocNo(docNo){
   if(segs.length===0) return '';
   const index = buildCodeTreeIndex();
   const startCandidates = index[segs[0].toUpperCase()] || [];
-  let best = null, bestMatched = -1;
+  let best = null, bestMatched = -1, bestIsLeaf = false;
   for(const start of startCandidates){
     let current = start, matched = 1;
     for(let i=1;i<segs.length;i++){
@@ -393,7 +393,10 @@ function resolveDeptPathFromDocNo(docNo){
       current = {key: matchKey, node: current.node[matchKey], path: current.path+' / '+matchKey};
       matched++;
     }
-    if(matched > bestMatched){ bestMatched = matched; best = current; }
+    const isLeaf = !current.node; // null／undefined 代表已到分類的最底層（葉節點），才是真正可歸檔的位置；還有子分類的中繼節點不是有效的所屬處室
+    // 比對到的段數相同時，優先選葉節點結果，而非停在半路的中繼節點（例如「MAD」同時是頂層部門代碼、也是部門底下某個代碼相同的子分類，須優先採信能歸到底層分類的那一個）
+    const better = !best || (isLeaf && !bestIsLeaf) || (isLeaf===bestIsLeaf && matched>bestMatched);
+    if(better){ bestMatched = matched; best = current; bestIsLeaf = isLeaf; }
   }
   return best ? best.path : '';
 }
