@@ -262,7 +262,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 72</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 73</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -357,15 +357,52 @@ const regTree={
 function buildRegTree(){const c=document.getElementById('sub-reg');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','reg-unit');}
 function buildFormTree(){const c=document.getElementById('sub-form');if(!c)return;c.innerHTML='';buildBranch(regTree,c,'','form-unit');}
 function flattenTreeLeaves(node){let out=[];for(const key in node){const ch=node[key];if(ch)out=out.concat(flattenTreeLeaves(ch));else out.push(key);}return out;}
+// ===== 文件編號 → 資料夾完整路徑 比對（解決不同廠別重複使用「OT其他」「MN管理」等相同葉節點名稱時的混淆）=====
+function extractTreeCode(key){
+  const m = (key||'').match(/[A-Za-z]{2,6}/);
+  return m ? m[0].toUpperCase() : '';
+}
+function buildCodeTreeIndex(){
+  const index = {};
+  (function walk(node, path){
+    for(const key in node){
+      const fp = path ? path+' / '+key : key;
+      const code = extractTreeCode(key);
+      if(code){ (index[code] = index[code]||[]).push({key, node: node[key], path: fp}); }
+      if(node[key]) walk(node[key], fp);
+    }
+  })(regTree, '');
+  return index;
+}
+function resolveDeptPathFromDocNo(docNo){
+  if(!docNo) return '';
+  const body = docNo.replace(/^TMRT-?/i,'');
+  const segs = body.split('-').filter(s=>/^[A-Za-z]+$/.test(s)); // 只取純英文字母的代碼片段，過濾掉純數字的階層碼跟流水號
+  if(segs.length===0) return '';
+  const index = buildCodeTreeIndex();
+  const startCandidates = index[segs[0].toUpperCase()] || [];
+  let best = null, bestMatched = -1;
+  for(const start of startCandidates){
+    let current = start, matched = 1;
+    for(let i=1;i<segs.length;i++){
+      if(!current.node || typeof current.node!=='object') break;
+      const code = segs[i].toUpperCase();
+      const childKeys = Object.keys(current.node);
+      const matchKey = childKeys.find(k=>extractTreeCode(k)===code);
+      if(!matchKey) break;
+      current = {key: matchKey, node: current.node[matchKey], path: current.path+' / '+matchKey};
+      matched++;
+    }
+    if(matched > bestMatched){ bestMatched = matched; best = current; }
+  }
+  return best ? best.path : '';
+}
 const SEARCH_EXTRA_UNITS=['運務處','行控中心','站務中心','票務中心','維修處','工安處','北段辦','南段辦'];
 function searchDeptOptions(){
-  const leaves=[];
-  flattenTreeLeaves(regTree).forEach(u=>{ if(!leaves.includes(u)) leaves.push(u); });
-  return [...leaves, ...SEARCH_EXTRA_UNITS];
+  return [...flattenLeaves(regTree).map(l=>l.path), ...SEARCH_EXTRA_UNITS];
 }
 function deptSelectHtml(id,current){
-  const leaves=[];
-  flattenTreeLeaves(regTree).forEach(u=>{ if(!leaves.includes(u)) leaves.push(u); });
+  const leaves=flattenLeaves(regTree).map(l=>l.path);
   const isOrphan = current && !leaves.includes(current);
   return `<select id="${id}">
     <option value="">請選擇所屬處室</option>
@@ -387,14 +424,12 @@ function resolveTreeNode(path){
   return node;
 }
 function deptsForPath(path){
-  if(!path)return flattenTreeLeaves(regTree);
-  const parts=path.split(' / ');
-  const lastKey=parts[parts.length-1];
+  if(!path)return flattenLeaves(regTree).map(l=>l.path);
   const node=resolveTreeNode(path);
   if(node && typeof node==='object'){
-    return flattenTreeLeaves(node);
+    return flattenLeaves(node, path).map(l=>l.path);
   }
-  return [lastKey];
+  return [path];
 }
 function buildBranch(node,container,path,pageKey){pageKey=pageKey||'reg-unit';for(const key in node){const fp=path?path+' / '+key:key;const ch=node[key];if(ch){const w=document.createElement('div');const t=document.createElement('div');t.className='nch';t.style.cssText='display:flex;justify-content:space-between;align-items:center';const label=document.createElement('span');label.textContent=key;label.style.cssText='flex:1;cursor:pointer';const ic=document.createElement('i');ic.className='ti ti-chevron-right';ic.style.cssText='font-size:11px;color:var(--tt);transition:transform .2s;cursor:pointer;padding:2px 6px';const s=document.createElement('div');s.style.cssText='display:none;padding-left:10px;border-left:0.5px solid var(--bt);margin-left:10px';const toggle=()=>{const o=s.style.display==='block';s.style.display=o?'none':'block';ic.style.transform=o?'':'rotate(90deg)'};ic.onclick=(e)=>{e.stopPropagation();toggle();};label.onclick=()=>{gp(pageKey,t,fp);if(s.style.display!=='block')toggle();};t.appendChild(label);t.appendChild(ic);buildBranch(ch,s,fp,pageKey);w.appendChild(t);w.appendChild(s);container.appendChild(w);if(key==='運務處(OPD)'){s.style.display='block';ic.style.transform='rotate(90deg)'}}else{const it=document.createElement('div');it.className='nch';it.textContent=key;it.onclick=()=>gp(pageKey,it,fp);container.appendChild(it)}}}
 
@@ -1656,7 +1691,7 @@ async function loadOrphanCheck(){
   if (!area) return;
   try {
     const {collection, query, where, getDocs} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const validDepts = new Set(flattenTreeLeaves(regTree));
+    const validDepts = new Set(flattenLeaves(regTree).map(l=>l.path));
     const [regSnap, formSnap] = await Promise.all([
       getDocs(query(collection(window._db, 'regulations'), where('status','==','active'))),
       getDocs(query(collection(window._db, 'forms'), where('status','==','active')))
@@ -1668,17 +1703,50 @@ async function loadOrphanCheck(){
       area.innerHTML = '<div class="info-box"><i class="ti ti-circle-check"></i>沒有發現孤兒文件，所有資料的所屬處室都對得到目前的資料夾結構</div>';
       return;
     }
-    area.innerHTML = `<div class="info-box" style="margin-bottom:10px"><i class="ti ti-alert-triangle"></i>共發現 ${orphans.length} 筆文件的「所屬處室」對不到目前任何資料夾，請逐筆重新指定分類，或若分類本身錯誤（例如規章誤存成表單）可直接刪除後重新上傳</div>` + orphans.map(o => `<div class="list-card" style="border-left-color:#E24B4A">
+    orphans.forEach(o => { o.suggested = resolveDeptPathFromDocNo(o.docNo); });
+    window._orphanItems = orphans;
+    const resolvedCount = orphans.filter(o=>o.suggested).length;
+    area.innerHTML = `<div class="info-box" style="margin-bottom:10px"><i class="ti ti-alert-triangle"></i>共發現 ${orphans.length} 筆文件的「所屬處室」對不到目前任何資料夾——多半是舊資料仍存著舊格式（例如只存「OT其他」而非完整路徑），導致不同廠別的相同分類名稱互相混淆；系統已依文件編號自動比對出 ${resolvedCount} 筆建議分類，可個別或一次套用${resolvedCount?`</div><button class="btn btn-primary btn-sm" style="margin-bottom:10px" onclick="applyAllOrphanSuggestions()"><i class="ti ti-wand"></i> 套用全部 ${resolvedCount} 筆自動建議</button><div class="info-box" style="margin-bottom:10px"`:''}></div>` + orphans.map((o,i) => `<div class="list-card" id="orphan-item-${i}" style="border-left-color:#E24B4A">
       <div style="font-size:13px;font-weight:600">${escapeHtml(o.label)}｜${escapeHtml(o.title||'—')} <span style="font-weight:400;color:var(--ts);font-size:11px">（${escapeHtml(o.docNo||'—')}）</span></div>
       <div style="font-size:12px;color:var(--ts);margin-top:6px">目前記錄的所屬處室：<span style="color:#E24B4A">${escapeHtml(o.dept||'（空白）')}</span>（找不到對應資料夾）</div>
+      ${o.suggested?`<div style="font-size:12px;color:#27500A;margin-top:4px">依文件編號建議改為：<b>${escapeHtml(o.suggested)}</b></div>`:`<div style="font-size:12px;color:#856404;margin-top:4px">無法從文件編號自動判斷正確分類，請手動指定</div>`}
       <div style="margin-top:8px;display:flex;gap:6px">
-        <button class="btn btn-sm" onclick='openEdit(${JSON.stringify(o.kind)},${JSON.stringify(o.id)})'><i class="ti ti-edit"></i> 重新指定所屬處室</button>
+        ${o.suggested?`<button class="btn btn-sm btn-primary" onclick="applyOrphanSuggestion(${i})"><i class="ti ti-check"></i> 套用建議分類</button>`:''}
+        <button class="btn btn-sm" onclick='openEdit(${JSON.stringify(o.kind)},${JSON.stringify(o.id)})'><i class="ti ti-edit"></i> 手動重新指定</button>
         ${window._level==='S'?`<button class="btn btn-sm" style="color:#E24B4A" onclick='deleteOrphanItem(${JSON.stringify(o.kind)},${JSON.stringify(o.id)},${JSON.stringify(o.title||"")})'><i class="ti ti-trash"></i> 刪除</button>`:''}
       </div>
     </div>`).join('');
   } catch(e) {
     area.innerHTML = `<div class="pholder">檢查失敗：${e.message}</div>`;
   }
+}
+async function applyOrphanSuggestion(i){
+  const o = (window._orphanItems||[])[i];
+  if (!o || !o.suggested) return;
+  const el = document.getElementById(`orphan-item-${i}`);
+  try{
+    const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await updateDoc(doc(window._db, o.kind==='regulation'?'regulations':'forms', o.id), {dept: o.suggested, updatedAt: serverTimestamp(), updatedBy: window._uid});
+    await logActivity(o.kind, 'update', o.id, o.title, '所屬處室校正：'+o.dept+' → '+o.suggested, o.suggested);
+    if (el) el.remove();
+    showToast('已套用');
+  }catch(e){ showToast('套用失敗：'+e.message); }
+}
+async function applyAllOrphanSuggestions(){
+  const items = (window._orphanItems||[]).filter(o=>o.suggested);
+  if (items.length===0) return;
+  if (!confirm(`確定要一次套用 ${items.length} 筆自動建議的分類嗎？`)) return;
+  const {doc, updateDoc, serverTimestamp} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  let ok=0, fail=0;
+  for (const o of items) {
+    try{
+      await updateDoc(doc(window._db, o.kind==='regulation'?'regulations':'forms', o.id), {dept: o.suggested, updatedAt: serverTimestamp(), updatedBy: window._uid});
+      await logActivity(o.kind, 'update', o.id, o.title, '所屬處室校正：'+o.dept+' → '+o.suggested, o.suggested);
+      ok++;
+    }catch(e){ fail++; }
+  }
+  showToast(`批次套用完成：成功 ${ok} 筆${fail?`，失敗 ${fail} 筆`:''}`);
+  loadOrphanCheck();
 }
 async function deleteOrphanItem(kind, docId, title){
   if(!confirm(`確定要刪除「${title||'此筆資料'}」嗎？\n（資料不會被永久刪除，僅會下架，S級可從資料庫救回；若分類錯誤，刪除後請重新上傳到正確的規章／表單分類）`)) return;
@@ -4103,14 +4171,15 @@ function flattenLeaves(node, path, out){
 }
 function deptOptionsHtml(selected){
   const leaves = flattenLeaves(regTree);
-  return '<option value="">請選擇</option>' + leaves.map(l=>`<option value="${l.name}" ${l.name===selected?'selected':''}>${l.path}</option>`).join('');
+  return '<option value="">請選擇</option>' + leaves.map(l=>`<option value="${escapeHtml(l.path)}" ${l.path===selected?'selected':''}>${escapeHtml(l.path)}</option>`).join('');
 }
 function guessDeptFromCode(code){
+  // 已改用 resolveDeptPathFromDocNo() 做完整文件編號比對，此函式僅保留給極少數僅有單一片段代碼可用的場景
   if(!code) return '';
   const up = code.toUpperCase();
   const leaves = flattenLeaves(regTree);
   const hit = leaves.find(l=>l.name.toUpperCase().includes(up));
-  return hit ? hit.name : '';
+  return hit ? hit.path : '';
 }
 
 // ===== 從PDF全文比對抓取文件metadata（文件編號/處室/版次/核決日期/名稱） =====
@@ -4128,7 +4197,8 @@ function flexLabel(label){
 // 支援格式如：TMRT-ISD-GEN-0-4001職業災害速報表(2版).docx
 function extractMetaFromFilename(fileName){
   const base = fileName.replace(/\.[a-zA-Z0-9]+$/, '');
-  const docMatch = base.match(/^TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+  // 標準格式：TMRT-部門-類別-單一階層碼-流水號（如 TMRT-HRD-GEN-0-2001）；另有部分廠別（如電子廠ELP）採三段代碼、無獨立階層碼（如 TMRT-ELP-COM-ACS-3003），兩種格式都要支援
+  const docMatch = base.match(/^TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i) || base.match(/^TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-[A-Z]{2,6}-\d{3,5}/i);
   if (!docMatch) return null;
   const docNo = docMatch[0].toUpperCase();
   let rest = base.slice(docMatch[0].length);
@@ -4140,21 +4210,16 @@ function extractMetaFromFilename(fileName){
     rest = rest.slice(0, verMatch.index);
   }
   const title = rest.replace(/^[_\s\(（]+|[_\s\)）]+$/g, '').trim();
-  const parts = docNo.split('-');
-  const dept = guessDeptFromCode(parts[1]) || guessDeptFromCode(parts[2]) || '';
+  const dept = resolveDeptPathFromDocNo(docNo);
   return {docNo, title, version, dept};
 }
 
 function extractDocMetaFromText(text, fileName){
   const norm = normalizeExtractedText(text);
   const compact = norm.replace(/\s+/g,''); // 完全去空白版本，專門用來抓文件編號這類代碼（代碼本身不該有空白）
-  const docNoMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i);
+  const docNoMatch = compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-\d-\d{3,5}/i) || compact.match(/TMRT-[A-Z0-9]{2,6}-[A-Z0-9]{2,6}-[A-Z]{2,6}-\d{3,5}/i);
   const docNo = docNoMatch ? docNoMatch[0].toUpperCase() : '';
-  let dept='';
-  if(docNo){
-    const parts = docNo.split('-');
-    dept = guessDeptFromCode(parts[1]) || guessDeptFromCode(parts[2]) || '';
-  }
+  const dept = docNo ? resolveDeptPathFromDocNo(docNo) : '';
   const verMatch = norm.match(new RegExp(flexLabel('版次')+'[:：]?\\s*([0-9]+)'));
   const version = verMatch ? verMatch[1] : '';
   const dateMatch = norm.match(new RegExp(flexLabel('核決日期')+'[:：]?\\s*([0-9]{2,4}[\\/\\-\\.][0-9]{1,2}[\\/\\-\\.][0-9]{1,2})'));
