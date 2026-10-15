@@ -245,6 +245,8 @@ function toggleMobileSidebar(forceState){
     <div class="nc" id="sub-reg"></div>
     <div class="ni" style="display:flex;align-items:center;gap:0"><span style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer" onclick="gp('form-unit',this.closest('.ni'),'')"><i class="ti ti-file-text"></i>表單</span><i class="ti ti-chevron-right na" style="cursor:pointer;padding:4px 6px" onclick="toggleSub('sub-form',this.closest('.ni'))"></i></div>
     <div class="nc" id="sub-form"></div>
+    <div class="nsec">薪資查詢</div>
+    <div class="ni" onclick="gp('salary',this)"><i class="ti ti-coin"></i>薪資查詢</div>
     <div class="nsec">密碼</div>
     <div class="ni" onclick="openChangePwd()"><i class="ti ti-key"></i>修改密碼</div>
     <div class="nsec" id="nsec-admin" style="display:none">後臺</div>
@@ -447,6 +449,7 @@ function gp(key,el,param){
   const map={
     readme:pageReadme,search:pageSearch,
     duty:pageDuty,notice:pageNotice,
+    salary:pageSalary,
     'reg-unit':()=>pageRegUnit(param),
     'form-unit':()=>pageFormUnit(param),
     'admin-upload-duty':pageUploadDuty,'admin-upload-notice':pageUploadNotice,
@@ -460,11 +463,264 @@ function gp(key,el,param){
   if(key==='readme') setTimeout(loadReadmeReg, 0);
   if(key==='duty') setTimeout(loadDutyList, 0);
   if(key==='notice') setTimeout(loadNoticeList, 0);
+  if(key==='salary') setTimeout(initSalaryPage, 0);
   if(key==='admin-upload-reg') { initDropZone('reg-drop-zone','rfs','rfl'); initBatchDropZone('reg-batch-drop-zone','reg-batch-folder'); }
   if(key==='admin-upload-form') { initDropZone('form-drop-zone','ffs','ffl'); initBatchDropZone('form-batch-drop-zone','form-batch-folder'); }
   if(key==='admin-upload-duty') { initDropZone('duty-drop-zone','dfs','dfl'); initRichEditor('dc','dc-tb'); }
   if(key==='admin-upload-notice') { initDropZone('notice-drop-zone','nfs','nfl'); initDropZone('notice-list-drop-zone','notice-list-file',null); initDropZone('notice-attach-drop-zone','notice-attach-files',null); initBatchDropZone('notice-batch-drop-zone','notice-batch-folder'); initRichEditor('nc','nc-tb'); }
 }
+
+/* ===== 薪資查詢 =====
+   資料來源：
+   - 職稱／職等區間：組織規程 TMRT-HRD-GEN-0-2013（第3版）職務列等表
+   - 本俸金額：從業人員薪給要點 TMRT-HRD-GEN-0-2015（第5版）附表二 薪點折算薪額基準表
+   - 職務加給／專業加給：同上，從業人員加給基準表
+   未來規程更版時，僅需更新下方 SALARY_* 常數即可同步反映新數值。
+*/
+const SALARY_PAY_TABLE={ // 職等 -> 各職級(1起)對應之本俸金額(NT$)，依附表二
+  18:[63716,64911,66106,67301,68496],
+  17:[57742,58937,60131,61326,62521],
+  16:[51767,52962,54157,55352,56547,57742,58937,60131,61326],
+  15:[46457,47519,48581,49643,50705,51767,52962,54157,55352,56547,57742,58937,60131],
+  14:[42474,43270,44067,44863,45660,46457,47519,48581,49643,50705,51767,52962,54157,55352,56547],
+  13:[39818,40349,40881,41412,41943,42474,43270,44067,44863,45660,46457,47519,48581,49643,50705],
+  12:[35134,36071,37008,37945,38882,39818,40349,40881,41412,41943,42474,43270,44067,44863,45660],
+  11:[30449,31386,32323,33260,34197,35134,36071,37008,37945,38882,39818,40349,40881,41412,41943],
+  10:[27029,27713,28397,29081,29765,30449,31386,32323,33260,34197,35134,36071,37008,37945,38882],
+  9:[24463,24977,25490,26003,26516,27029,27713,28397,29081,29765,30449,31386,32323,33260,34197],
+  8:[21898,22411,22924,23437,23950,24463,24977,25490,26003,26516,27029,27713,28397,29081,29765],
+  7:[19333,19846,20359,20872,21385,21898,22411,22924,23437,23950,24463,24977,25490,26003,26516],
+  6:[16767,17280,17793,18306,18819,19333,19846,20359,20872,21385,21898,22411,22924,23437,23950],
+  5:[15370,15649,15929,16208,16488,16767,17280,17793,18306,18819,19333,19846,20359,20872,21385],
+  4:[13973,14252,14532,14811,15090,15370,15649,15929,16208,16488,16767,17280,17793,18306,18819],
+  3:[12575,12855,13134,13414,13693,13973,14252,14532,14811,15090,15370,15649,15929,16208,16488],
+  2:[11178,11458,11737,12017,12296,12575,12855,13134,13414,13693,13973,14252,14532,14811,15090],
+  1:[9781,10060,10340,10619,10899,11178,11458,11737,12017,12296,12575,12855,13134,13414,13693]
+};
+const SALARY_TITLE_GROUPS=[ // 職務列等表區間 ＋ 加給基準表金額，依組織規程與薪給要點核對
+  {titles:['副總經理'],gradeMin:17,gradeMax:18,postAllow:53675,profAllow:13418},
+  {titles:['資深協理'],gradeMin:16,gradeMax:17,postAllow:42919,profAllow:11933},
+  {titles:['處長','主任'],gradeMin:16,gradeMax:17,postAllow:47724,profAllow:11943},
+  {titles:['協理'],gradeMin:15,gradeMax:16,postAllow:39584,profAllow:10994},
+  {titles:['副處長'],gradeMin:15,gradeMax:16,postAllow:44020,profAllow:11005},
+  {titles:['高級工程師'],gradeMin:15,gradeMax:16,postAllow:34153,profAllow:9487},
+  {titles:['高級管理師'],gradeMin:15,gradeMax:16,postAllow:31504,profAllow:8751},
+  {titles:['廠長','中心主任'],gradeMin:14,gradeMax:15,postAllow:40613,profAllow:10154},
+  {titles:['正工程師'],gradeMin:15,gradeMax:16,postAllow:27719,profAllow:7699},
+  {titles:['正管理師'],gradeMin:15,gradeMax:16,postAllow:27267,profAllow:7574},
+  {titles:['副廠長','中心副主任'],gradeMin:13,gradeMax:14,postAllow:37134,profAllow:9284},
+  {titles:['課長'],gradeMin:13,gradeMax:14,postAllow:33335,profAllow:8334},
+  {titles:['組長','控制長'],gradeMin:12,gradeMax:13,postAllow:32373,profAllow:8094},
+  {titles:['段長'],gradeMin:12,gradeMax:13,postAllow:29035,profAllow:7259},
+  {titles:['副工程師'],gradeMin:12,gradeMax:13,postAllow:24038,profAllow:6677},
+  {titles:['副管理師'],gradeMin:12,gradeMax:13,postAllow:22598,profAllow:6277},
+  {titles:['股長','副段長','控制工程師'],gradeMin:10,gradeMax:12,postAllow:26801,profAllow:6927},
+  {titles:['助理工程師'],gradeMin:10,gradeMax:12,postAllow:23665,profAllow:6452},
+  {titles:['助理管理師'],gradeMin:10,gradeMax:12,postAllow:21703,profAllow:6119},
+  {titles:['領班'],gradeMin:8,gradeMax:11,postAllow:23130,profAllow:5627},
+  {titles:['站長'],gradeMin:8,gradeMax:11,postAllow:21831,profAllow:4862},
+  {titles:['資深工程員'],gradeMin:8,gradeMax:11,postAllow:21764,profAllow:6313},
+  {titles:['資深專員'],gradeMin:8,gradeMax:11,postAllow:20301,profAllow:5910},
+  {titles:['技術士'],gradeMin:7,gradeMax:10,postAllow:20660,profAllow:5104},
+  {titles:['副站長'],gradeMin:7,gradeMax:10,postAllow:19100,profAllow:4494},
+  {titles:['工程員'],gradeMin:7,gradeMax:10,postAllow:19178,profAllow:5104},
+  {titles:['專員'],gradeMin:7,gradeMax:10,postAllow:17965,profAllow:4862},
+  {titles:['助理工程員'],gradeMin:6,gradeMax:8,postAllow:17781,profAllow:4850},
+  {titles:['助理專員'],gradeMin:6,gradeMax:8,postAllow:16570,profAllow:4479},
+  {titles:['技術員'],gradeMin:5,gradeMax:8,postAllow:18089,profAllow:4487},
+  {titles:['站務員','行控資訊員','票務員','客服員'],gradeMin:5,gradeMax:8,postAllow:17265,profAllow:4261},
+  {titles:['事務員'],gradeMin:4,gradeMax:8,postAllow:16271,profAllow:4030},
+  {titles:['服務員'],gradeMin:1,gradeMax:4,postAllow:13822,profAllow:3495}
+];
+const SALARY_TITLES=(()=>{const out=[];SALARY_TITLE_GROUPS.forEach((g,gi)=>{g.titles.forEach((name,ti)=>{out.push({id:'g'+gi+'-'+ti,name,group:g});});});return out;})();
+function salaryFindTitle(id){return SALARY_TITLES.find(t=>t.id===id)||SALARY_TITLES[0];}
+function salaryMaxLevel(grade){return (SALARY_PAY_TABLE[grade]||[]).length;}
+function salaryPayFor(grade,level){const arr=SALARY_PAY_TABLE[grade]||[];return arr[level-1]||0;}
+function salaryFmt(n){return Number(n||0).toLocaleString('zh-TW');}
+
+let salaryRows=[];
+function initSalaryPage(){
+  const t0=SALARY_TITLES[0];
+  salaryRows=[{titleId:t0.id,grade:t0.group.gradeMin,level:1}];
+  salaryRenderRows();
+}
+function salaryTab(tab,el){
+  document.querySelectorAll('#salary-tabs .tab').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('salary-calc').style.display=tab==='calc'?'block':'none';
+  document.getElementById('salary-ref').style.display=tab==='ref'?'block':'none';
+  if(tab==='ref') salaryRenderRef();
+}
+function salaryAddRow(){
+  if(salaryRows.length>=4)return;
+  const t0=SALARY_TITLES[0];
+  salaryRows.push({titleId:t0.id,grade:t0.group.gradeMin,level:1});
+  salaryRenderRows();
+}
+function salaryRemoveRow(idx){
+  if(salaryRows.length<=1)return;
+  salaryRows.splice(idx,1);
+  salaryRenderRows();
+}
+function salaryOnTitleChange(idx,titleId){
+  const t=salaryFindTitle(titleId);
+  salaryRows[idx]={titleId:t.id,grade:t.group.gradeMin,level:1};
+  salaryRenderRows();
+}
+function salaryOnGradeChange(idx,grade){
+  grade=parseInt(grade,10);
+  salaryRows[idx].grade=grade;
+  salaryRows[idx].level=1;
+  salaryRenderRows();
+}
+function salaryOnLevelChange(idx,level){
+  salaryRows[idx].level=parseInt(level,10);
+  salaryRenderRows();
+}
+function salaryRowCalc(row){
+  const title=salaryFindTitle(row.titleId);
+  const grade=Math.max(title.group.gradeMin,Math.min(title.group.gradeMax,row.grade));
+  const maxLv=salaryMaxLevel(grade)||1;
+  const level=Math.max(1,Math.min(maxLv,row.level));
+  const basic=salaryPayFor(grade,level);
+  const total=basic+title.group.postAllow+title.group.profAllow;
+  return {title,grade,level,maxLv,basic,total};
+}
+function salaryRenderRows(){
+  const host=document.getElementById('salary-rows');
+  if(!host)return;
+  const calcs=salaryRows.map(salaryRowCalc);
+  host.innerHTML=salaryRows.map((row,idx)=>{
+    const c=calcs[idx];
+    const gradeOpts=[];
+    for(let g=c.title.group.gradeMin; g<=c.title.group.gradeMax; g++) gradeOpts.push(g);
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:500;color:var(--ti)">試算 ${idx+1}</div>
+        ${salaryRows.length>1?`<button onclick="salaryRemoveRow(${idx})" style="border:none;background:transparent;color:var(--tt);font-size:12px;cursor:pointer;padding:4px 8px">移除 ✕</button>`:''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px">
+        <div>
+          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">1. 職稱</label>
+          <select onchange="salaryOnTitleChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
+            ${SALARY_TITLES.map(t=>`<option value="${t.id}" ${t.id===row.titleId?'selected':''}>${escapeHtml(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">2. 職等（依職稱自動限制範圍）</label>
+          <select onchange="salaryOnGradeChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
+            ${gradeOpts.map(g=>`<option value="${g}" ${g===c.grade?'selected':''}>第 ${g} 職等</option>`).join('')}
+          </select>
+          <div style="font-size:11px;color:var(--tt);margin-top:4px">可選範圍：第 ${c.title.group.gradeMin}～${c.title.group.gradeMax} 職等</div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">3. 職級</label>
+          <select onchange="salaryOnLevelChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
+            ${Array.from({length:c.maxLv},(_,i)=>i+1).map(l=>`<option value="${l}" ${l===c.level?'selected':''}>第 ${l} 級</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:14px;border-top:0.5px dashed var(--bt)">
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">本俸</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.basic)}</div></div>
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">職務加給</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.title.group.postAllow)}</div></div>
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">專業加給</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.title.group.profAllow)}</div></div>
+        <div style="background:var(--ci);border-radius:var(--rm);padding:6px 10px;margin:-6px -10px">
+          <div style="font-size:11px;color:var(--ti);margin-bottom:3px">加總</div>
+          <div style="font-size:17px;font-weight:700;color:var(--ti)">NT$ ${salaryFmt(c.total)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')
+  + (salaryRows.length<4?`<button onclick="salaryAddRow()" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px dashed var(--bi);color:var(--ti);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rm);cursor:pointer;margin-bottom:20px">＋ 新增一筆試算進行薪資比較</button>`:'')
+  + salaryCompareHtml(calcs);
+}
+function salaryCompareHtml(calcs){
+  if(calcs.length<2)return '';
+  const base=calcs[0];
+  const rows=calcs.map((c,idx)=>{
+    const diff=c.total-base.total;
+    const diffTxt= idx===0 ? '基準' : (diff>=0?('+NT$ '+salaryFmt(diff)):('-NT$ '+salaryFmt(Math.abs(diff))));
+    const diffColor= idx===0 ? 'var(--ts)' : (diff>=0?'#1D9E75':'#E24B4A');
+    return `<tr style="border-bottom:0.5px solid var(--bt)">
+      <td style="padding:10px;color:var(--tp)">試算 ${idx+1}</td>
+      <td style="padding:10px;color:var(--tp)">${escapeHtml(c.title.name)}／第${c.grade}職等／第${c.level}級</td>
+      <td style="padding:10px;text-align:right;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.total)}</td>
+      <td style="padding:10px;text-align:right;font-weight:600;color:${diffColor}">${diffTxt}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card">
+    <div style="font-size:14px;font-weight:500;color:var(--tp);margin-bottom:4px">薪資比較</div>
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">以「試算 1」為基準，顯示其他試算與其加總之差額。</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:480px">
+      <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)">
+        <th style="padding:8px 10px;font-weight:500">試算</th>
+        <th style="padding:8px 10px;font-weight:500">職稱／職等／職級</th>
+        <th style="padding:8px 10px;font-weight:500;text-align:right">加總</th>
+        <th style="padding:8px 10px;font-weight:500;text-align:right">與基準差額</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+function salaryRenderRef(){
+  const host=document.getElementById('salary-ref-body');
+  if(!host)return;
+  const gradeRows=SALARY_TITLE_GROUPS.map(g=>`<tr style="border-bottom:0.5px solid var(--bt)">
+      <td style="padding:8px 10px;color:var(--tp)">${escapeHtml(g.titles.join('、'))}</td>
+      <td style="padding:8px 10px;text-align:center;color:var(--tp)">第 ${g.gradeMin}${g.gradeMin!==g.gradeMax?'～'+g.gradeMax:''} 職等</td>
+    </tr>`).join('');
+  const allowRows=SALARY_TITLE_GROUPS.map(g=>`<tr style="border-bottom:0.5px solid var(--bt)">
+      <td style="padding:8px 10px;color:var(--tp)">${escapeHtml(g.titles.join('、'))}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--tp)">NT$ ${salaryFmt(g.postAllow)}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--tp)">NT$ ${salaryFmt(g.profAllow)}</td>
+    </tr>`).join('');
+  const grades=Object.keys(SALARY_PAY_TABLE).map(Number).sort((a,b)=>b-a);
+  const maxLv=Math.max(...grades.map(g=>SALARY_PAY_TABLE[g].length));
+  const payRows=grades.map(g=>{
+    const arr=SALARY_PAY_TABLE[g];
+    let cells='';
+    for(let l=1;l<=maxLv;l++) cells+=`<td style="padding:6px 8px;text-align:right;color:${arr[l-1]?'var(--tp)':'var(--tt)'}">${arr[l-1]?salaryFmt(arr[l-1]):'－'}</td>`;
+    return `<tr style="border-bottom:0.5px solid var(--bt)"><td style="padding:6px 8px;font-weight:600;color:var(--tp)">第${g}職等</td>${cells}</tr>`;
+  }).join('');
+  const payHead=Array.from({length:maxLv},(_,i)=>`<th style="padding:6px 8px;text-align:right;font-weight:500">${i+1}</th>`).join('');
+
+  host.innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">(1) 職務列等表　－　職稱對應職等區間</div>
+      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：組織規程 TMRT-HRD-GEN-0-2013</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">
+        <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:8px 10px;font-weight:500">職稱</th><th style="padding:8px 10px;font-weight:500;text-align:center">職等區間</th></tr></thead>
+        <tbody>${gradeRows}</tbody>
+      </table></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">(2) 從業人員加給基準表</div>
+      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：從業人員薪給要點 TMRT-HRD-GEN-0-2015</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">
+        <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:8px 10px;font-weight:500">職稱</th><th style="padding:8px 10px;font-weight:500;text-align:right">職務加給</th><th style="padding:8px 10px;font-weight:500;text-align:right">專業加給</th></tr></thead>
+        <tbody>${allowRows}</tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">(3) 薪點折算薪額基準表（附表二）</div>
+      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：從業人員薪給要點 TMRT-HRD-GEN-0-2015 附表二；欄為職級，列為職等，金額為新臺幣元</div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px">
+        <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:6px 8px;font-weight:500">職等</th>${payHead}</tr></thead>
+        <tbody>${payRows}</tbody>
+      </table></div>
+    </div>`;
+}
+function pageSalary(){return `<div class="ptitle">薪資查詢</div><div class="psub">依「組織規程」職務列等表決定職稱對應職等範圍，再依「從業人員薪給要點」自動計算本俸、職務加給與專業加給</div>
+<div id="salary-tabs" style="display:flex;gap:6px;border-bottom:0.5px solid var(--bt);margin-bottom:16px">
+  <div class="tab active" onclick="salaryTab('calc',this)">薪資試算</div>
+  <div class="tab" onclick="salaryTab('ref',this)">參考表</div>
+</div>
+<div id="salary-calc">
+  <div id="salary-rows"></div>
+</div>
+<div id="salary-ref" style="display:none">
+  <div id="salary-ref-body"></div>
+</div>`;}
 
 function pageReadme(){return`<div class="ptitle">導讀</div><div class="psub">系統說明與參考依據</div>
 
