@@ -264,7 +264,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 79</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 80</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -733,20 +733,24 @@ function salaryRenderRef(){
 
   host.innerHTML=`
     <div class="card" style="margin-bottom:12px">
-      <div class="card-title">(1) 職務列等表　－　職稱對應職等區間</div>
-      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：組織規程 TMRT-HRD-GEN-0-2013</div>
-      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">
-        <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:8px 10px;font-weight:500">職稱</th><th style="padding:8px 10px;font-weight:500;text-align:center">職等區間</th></tr></thead>
-        <tbody>${gradeRows}</tbody>
-      </table></div>
-    </div>
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-title">(2) 從業人員加給基準表</div>
-      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：從業人員薪給要點 TMRT-HRD-GEN-0-2015</div>
-      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">
-        <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:8px 10px;font-weight:500">職稱</th><th style="padding:8px 10px;font-weight:500;text-align:right">職務加給</th><th style="padding:8px 10px;font-weight:500;text-align:right">專業加給</th></tr></thead>
-        <tbody>${allowRows}</tbody>
-      </table></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="card-title">(1) 職務列等表　－　職稱對應職等區間</div>
+          <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：組織規程 TMRT-HRD-GEN-0-2013</div>
+          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:7px 10px;font-weight:500">職稱</th><th style="padding:7px 10px;font-weight:500;text-align:center">職等區間</th></tr></thead>
+            <tbody>${gradeRows}</tbody>
+          </table></div>
+        </div>
+        <div style="border-left:0.5px solid var(--bt);padding-left:20px">
+          <div class="card-title">(2) 從業人員加給基準表</div>
+          <div style="font-size:11px;color:var(--tt);margin-bottom:10px">依據：從業人員薪給要點 TMRT-HRD-GEN-0-2015</div>
+          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:7px 10px;font-weight:500">職稱</th><th style="padding:7px 10px;font-weight:500;text-align:right">職務加給</th><th style="padding:7px 10px;font-weight:500;text-align:right">專業加給</th></tr></thead>
+            <tbody>${allowRows}</tbody>
+          </table></div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title">(3) 薪點折算薪額基準表（附表二）</div>
@@ -765,23 +769,20 @@ function salaryRenderRef(){
         ・<b>代扣健保費</b>：按加總金額對應全民健康保險投保金額分級表級距（本人負擔比率30%），依衛生福利部中央健康保險署公告分擔金額表計算。<br>
         ・勞工退休金（公司提撥6%）為雇主負擔，不列入員工代扣項目，故不影響實領金額。
       </div>
-      ${(()=>{const liRows=SALARY_LI_BRACKETS.map(b=>`<tr style="border-bottom:0.5px solid var(--bt)"><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[0])}</td><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[1])}</td></tr>`).join('');
-        const nhiRows=SALARY_NHI_BRACKETS.map(b=>`<tr style="border-bottom:0.5px solid var(--bt)"><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[0])}</td><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[1])}</td></tr>`).join('');
-        return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:6px">勞工保險（115.1.1生效）</div>
-            <div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-              <thead><tr style="text-align:right;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:5px 8px;font-weight:500">投保薪資</th><th style="padding:5px 8px;font-weight:500">本人負擔</th></tr></thead>
-              <tbody>${liRows}</tbody>
-            </table></div>
-          </div>
-          <div>
-            <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:6px">全民健康保險（115.1.1生效）</div>
-            <div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-              <thead><tr style="text-align:right;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:5px 8px;font-weight:500">投保金額</th><th style="padding:5px 8px;font-weight:500">本人負擔</th></tr></thead>
-              <tbody>${nhiRows}</tbody>
-            </table></div>
-          </div>
+      ${(()=>{
+        const chip=b=>`<div style="background:var(--cs);border-radius:var(--rm);padding:5px 6px;text-align:center">
+            <div style="font-size:10.5px;color:var(--ts)">${salaryFmt(b[0])}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--tp)">${salaryFmt(b[1])}</div>
+          </div>`;
+        const liItems=SALARY_LI_BRACKETS.map(chip).join('');
+        const nhiItems=SALARY_NHI_BRACKETS.map(chip).join('');
+        return `<div style="margin-bottom:18px">
+          <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:8px">勞工保險投保薪資級距（115.1.1生效，共${SALARY_LI_BRACKETS.length}級，上限45,800）－ 上：投保薪資／下：本人負擔</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px">${liItems}</div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:8px">全民健康保險投保金額級距（115.1.1生效，共${SALARY_NHI_BRACKETS.length}級，上限313,000）－ 上：投保金額／下：本人負擔</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px">${nhiItems}</div>
         </div>`;})()}
     </div>`;
 }
