@@ -264,7 +264,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 77</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 78</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -537,6 +537,34 @@ function salaryFindTitle(id){return SALARY_TITLES.find(t=>t.id===id)||SALARY_TIT
 function salaryMaxLevel(grade){return (SALARY_PAY_TABLE[grade]||[]).length;}
 function salaryPayFor(grade,level){const arr=SALARY_PAY_TABLE[grade]||[];return arr[level-1]||0;}
 function salaryFmt(n){return Number(n||0).toLocaleString('zh-TW');}
+const SALARY_WELFARE_RATE=0.005; // 職工福利金條例第2條第1項第3款：每月於職員工薪津內各扣千分之五
+const SALARY_LI_BRACKETS=[ // 勞工保險投保薪資分級表（115.1.1生效，共11級，上限45,800）＋被保險人負擔金額(一般事故+就業保險)
+  [29500,738],[30300,758],[31800,795],[33300,833],[34800,870],[36300,908],
+  [38200,955],[40100,1002],[42000,1050],[43900,1098],[45800,1145]
+];
+const SALARY_NHI_BRACKETS=[ // 全民健康保險投保金額分級表（115.1.1生效，共58級，上限313,000）＋被保險人(本人)負擔金額(負擔比率30%)
+  [29500,458],[30300,470],[31800,493],[33300,516],[34800,540],[36300,563],
+  [38200,592],[40100,622],[42000,651],[43900,681],[45800,710],[48200,748],
+  [50600,785],[53000,822],[55400,859],[57800,896],[60800,943],[63800,990],
+  [66800,1036],[69800,1083],[72800,1129],[76500,1187],[80200,1244],[83900,1301],
+  [87600,1359],[92100,1428],[96600,1498],[101100,1568],[105600,1638],[110100,1708],
+  [115500,1791],[120900,1875],[126300,1959],[131700,2043],[137100,2126],[142500,2210],
+  [147900,2294],[150000,2327],[156400,2426],[162800,2525],[169200,2624],[175600,2724],
+  [182000,2823],[189500,2939],[197000,3055],[204500,3172],[212000,3288],[219500,3404],
+  [228200,3539],[236900,3674],[245600,3809],[254300,3944],[263000,4079],[273000,4234],
+  [283000,4389],[293000,4544],[303000,4700],[313000,4855]
+];
+function salaryDeductFor(gross,brackets){
+  for(let i=0;i<brackets.length;i++){ if(gross<=brackets[i][0]) return brackets[i][1]; }
+  return brackets[brackets.length-1][1]; // 超過最高級距者，以最高級距計
+}
+function salaryDeductions(gross){
+  const welfare=Math.round(gross*SALARY_WELFARE_RATE);
+  const li=salaryDeductFor(gross,SALARY_LI_BRACKETS);
+  const nhi=salaryDeductFor(gross,SALARY_NHI_BRACKETS);
+  const total=welfare+li+nhi;
+  return {welfare,li,nhi,total,net:gross-total};
+}
 
 let salaryRows=[];
 function initSalaryPage(){
@@ -584,7 +612,8 @@ function salaryRowCalc(row){
   const level=Math.max(1,Math.min(maxLv,row.level));
   const basic=salaryPayFor(grade,level);
   const total=basic+title.group.postAllow+title.group.profAllow;
-  return {title,grade,level,maxLv,basic,total};
+  const ded=salaryDeductions(total);
+  return {title,grade,level,maxLv,basic,total,ded};
 }
 function salaryRenderRows(){
   const host=document.getElementById('salary-rows');
@@ -629,6 +658,19 @@ function salaryRenderRows(){
           <div style="font-size:17px;font-weight:700;color:var(--ti)">NT$ ${salaryFmt(c.total)}</div>
         </div>
       </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:14px;margin-top:14px;border-top:0.5px dashed var(--bt)">
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣福利金</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.welfare)}</div></div>
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣勞保費</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.li)}</div></div>
+        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣健保費</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.nhi)}</div></div>
+        <div style="background:#FAEEDA;border-radius:var(--rm);padding:6px 10px;margin:-6px -10px">
+          <div style="font-size:11px;color:#633806;margin-bottom:3px">應扣合計</div>
+          <div style="font-size:15px;font-weight:700;color:#633806">NT$ ${salaryFmt(c.ded.total)}</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;background:var(--ci);border-radius:var(--rl);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;color:var(--ti);font-weight:500">預估實領金額</div>
+        <div style="font-size:20px;font-weight:700;color:var(--ti)">NT$ ${salaryFmt(c.ded.net)}</div>
+      </div>
     </div>`;
   }).join('')
   + (salaryRows.length<4?`<button onclick="salaryAddRow()" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px dashed var(--bi);color:var(--ti);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rm);cursor:pointer;margin-bottom:20px">＋ 新增一筆試算進行薪資比較</button>`:'')
@@ -645,17 +687,19 @@ function salaryCompareHtml(calcs){
       <td style="padding:10px;color:var(--tp)">試算 ${idx+1}</td>
       <td style="padding:10px;color:var(--tp)">${escapeHtml(c.title.name)}／第${c.grade}職等／第${c.level}級</td>
       <td style="padding:10px;text-align:right;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.total)}</td>
+      <td style="padding:10px;text-align:right;color:var(--ts)">NT$ ${salaryFmt(c.ded.net)}</td>
       <td style="padding:10px;text-align:right;font-weight:600;color:${diffColor}">${diffTxt}</td>
     </tr>`;
   }).join('');
   return `<div class="card">
     <div style="font-size:14px;font-weight:500;color:var(--tp);margin-bottom:4px">薪資比較</div>
-    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">以「試算 1」為基準，顯示其他試算與其加總之差額。</div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:480px">
+    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">以「試算 1」為基準，顯示其他試算與其加總之差額（差額以稅前加總計算）。</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">
       <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)">
         <th style="padding:8px 10px;font-weight:500">試算</th>
         <th style="padding:8px 10px;font-weight:500">職稱／職等／職級</th>
         <th style="padding:8px 10px;font-weight:500;text-align:right">加總</th>
+        <th style="padding:8px 10px;font-weight:500;text-align:right">預估實領</th>
         <th style="padding:8px 10px;font-weight:500;text-align:right">與基準差額</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -708,9 +752,37 @@ function salaryRenderRef(){
         <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:6px 8px;font-weight:500">職等</th>${payHead}</tr></thead>
         <tbody>${payRows}</tbody>
       </table></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">(4) 代扣項目計算依據</div>
+      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">薪資試算頁「應扣合計／預估實領」即依下列基準估算，僅供參考，實際金額仍以薪資單及人力資源處公告為準</div>
+      <div style="font-size:12.5px;color:var(--tp);margin-bottom:12px;line-height:1.7">
+        ・<b>代扣福利金</b>：依職工福利金條例第2條第1項第3款，按月於薪津內扣千分之五（0.5%），四捨五入至元。<br>
+        ・<b>代扣勞保費</b>：按加總金額對應勞工保險投保薪資分級表級距（現行最高級距45,800元，超過者一律以此級距計），再依勞工保險局公告分擔金額表計算。<br>
+        ・<b>代扣健保費</b>：按加總金額對應全民健康保險投保金額分級表級距（本人負擔比率30%），依衛生福利部中央健康保險署公告分擔金額表計算。<br>
+        ・勞工退休金（公司提撥6%）為雇主負擔，不列入員工代扣項目，故不影響實領金額。
+      </div>
+      ${(()=>{const liRows=SALARY_LI_BRACKETS.map(b=>`<tr style="border-bottom:0.5px solid var(--bt)"><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[0])}</td><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[1])}</td></tr>`).join('');
+        const nhiRows=SALARY_NHI_BRACKETS.map(b=>`<tr style="border-bottom:0.5px solid var(--bt)"><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[0])}</td><td style="padding:5px 8px;text-align:right;color:var(--tp)">${salaryFmt(b[1])}</td></tr>`).join('');
+        return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:6px">勞工保險（115.1.1生效）</div>
+            <div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="text-align:right;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:5px 8px;font-weight:500">投保薪資</th><th style="padding:5px 8px;font-weight:500">本人負擔</th></tr></thead>
+              <tbody>${liRows}</tbody>
+            </table></div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ts);margin-bottom:6px">全民健康保險（115.1.1生效）</div>
+            <div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="text-align:right;color:var(--ts);border-bottom:0.5px solid var(--bt)"><th style="padding:5px 8px;font-weight:500">投保金額</th><th style="padding:5px 8px;font-weight:500">本人負擔</th></tr></thead>
+              <tbody>${nhiRows}</tbody>
+            </table></div>
+          </div>
+        </div>`;})()}
     </div>`;
 }
-function pageSalary(){return `<div class="ptitle">薪資查詢</div><div class="psub">依「組織規程」職務列等表決定職稱對應職等範圍，再依「從業人員薪給要點」自動計算本俸、職務加給與專業加給</div>
+function pageSalary(){return `<div class="ptitle">薪資查詢</div><div class="psub">依「組織規程」職務列等表決定職稱對應職等範圍，再依「從業人員薪給要點」自動計算本俸、職務加給與專業加給，並依現行勞健保分級表與職工福利金條例估算代扣項目及預估實領金額</div>
 <div id="salary-tabs" style="display:flex;gap:6px;border-bottom:0.5px solid var(--bt);margin-bottom:16px">
   <div class="tab active" onclick="salaryTab('calc',this)">薪資試算</div>
   <div class="tab" onclick="salaryTab('ref',this)">參考表</div>
