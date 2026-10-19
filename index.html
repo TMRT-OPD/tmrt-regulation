@@ -264,7 +264,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 78</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 79</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -538,9 +538,12 @@ function salaryMaxLevel(grade){return (SALARY_PAY_TABLE[grade]||[]).length;}
 function salaryPayFor(grade,level){const arr=SALARY_PAY_TABLE[grade]||[];return arr[level-1]||0;}
 function salaryFmt(n){return Number(n||0).toLocaleString('zh-TW');}
 const SALARY_WELFARE_RATE=0.005; // 職工福利金條例第2條第1項第3款：每月於職員工薪津內各扣千分之五
-const SALARY_LI_BRACKETS=[ // 勞工保險投保薪資分級表（115.1.1生效，共11級，上限45,800）＋被保險人負擔金額(一般事故+就業保險)
-  [29500,738],[30300,758],[31800,795],[33300,833],[34800,870],[36300,908],
-  [38200,955],[40100,1002],[42000,1050],[43900,1098],[45800,1145]
+const SALARY_LI_BRACKETS=[ // 勞工保險投保薪資分級表（依HR系統級距表，共26級，上限45,800）＋被保險人負擔金額(一般事故11.5%+就業保險1%，各自依20%負擔比率分別四捨五入後加總)
+  [13500,338],[15840,396],[16500,413],[17280,432],[17880,447],[19047,476],
+  [20008,500],[21009,525],[22000,550],[23100,577],[24000,600],[25250,632],
+  [26400,660],[27600,690],[28590,715],[29500,738],[30300,758],[31800,795],
+  [33300,833],[34800,870],[36300,908],[38200,955],[40100,1002],[42000,1050],
+  [43900,1098],[45800,1145]
 ];
 const SALARY_NHI_BRACKETS=[ // 全民健康保險投保金額分級表（115.1.1生效，共58級，上限313,000）＋被保險人(本人)負擔金額(負擔比率30%)
   [29500,458],[30300,470],[31800,493],[33300,516],[34800,540],[36300,563],
