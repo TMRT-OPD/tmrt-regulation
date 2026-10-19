@@ -264,7 +264,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 80</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 81</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -618,96 +618,71 @@ function salaryRowCalc(row){
   const ded=salaryDeductions(total);
   return {title,grade,level,maxLv,basic,total,ded};
 }
-function salaryRenderRows(){
-  const host=document.getElementById('salary-rows');
-  if(!host)return;
-  const calcs=salaryRows.map(salaryRowCalc);
-  host.innerHTML=salaryRows.map((row,idx)=>{
-    const c=calcs[idx];
-    const gradeOpts=[];
-    for(let g=c.title.group.gradeMin; g<=c.title.group.gradeMax; g++) gradeOpts.push(g);
-    return `<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:13px;font-weight:500;color:var(--ti)">試算 ${idx+1}</div>
-        ${salaryRows.length>1?`<button onclick="salaryRemoveRow(${idx})" style="border:none;background:transparent;color:var(--tt);font-size:12px;cursor:pointer;padding:4px 8px">移除 ✕</button>`:''}
+function salarySelectStyle(){return 'width:100%;padding:6px 8px;border:1px solid var(--bs);border-radius:var(--rm);font-size:12.5px;background:#fff;color:var(--tp);box-sizing:border-box';}
+function salaryLine(label,val){return `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px;color:var(--ts)"><span>${label}</span><span style="color:var(--tp);font-weight:500">NT$ ${salaryFmt(val)}</span></div>`;}
+function salaryDiffPill(label,d,strong){
+  const pos=d>=0;
+  const bg=strong?(pos?'#E1F5EE':'#FCEBEB'):'var(--cs)';
+  const fg=strong?(pos?'#0F6E56':'#A32D2D'):'var(--ts)';
+  return `<span style="padding:4px 12px;border-radius:99px;font-size:${strong?'12.5px':'12px'};${strong?'font-weight:700;':''}background:${bg};color:${fg}">${label} ${pos?'+':'-'}${strong?'NT$ ':''}${salaryFmt(Math.abs(d))}</span>`;
+}
+function salaryCardHtml(c,idx,n){
+  const gradeOpts=[];
+  for(let g=c.title.group.gradeMin; g<=c.title.group.gradeMax; g++) gradeOpts.push(g);
+  const ss=salarySelectStyle();
+  return `<div>
+    <div class="card" style="margin:0;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:500;color:var(--ti)">試算 ${idx+1}</span>
+        ${n>1?`<button onclick="salaryRemoveRow(${idx})" style="border:none;background:transparent;color:var(--tt);font-size:11px;cursor:pointer;padding:2px 4px">移除 ✕</button>`:''}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px">
-        <div>
-          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">1. 職稱</label>
-          <select onchange="salaryOnTitleChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
-            ${SALARY_TITLES.map(t=>`<option value="${t.id}" ${t.id===row.titleId?'selected':''}>${escapeHtml(t.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">2. 職等（依職稱自動限制範圍）</label>
-          <select onchange="salaryOnGradeChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
-            ${gradeOpts.map(g=>`<option value="${g}" ${g===c.grade?'selected':''}>第 ${g} 職等</option>`).join('')}
-          </select>
-          <div style="font-size:11px;color:var(--tt);margin-top:4px">可選範圍：第 ${c.title.group.gradeMin}～${c.title.group.gradeMax} 職等</div>
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;color:var(--ts);margin-bottom:6px">3. 職級</label>
-          <select onchange="salaryOnLevelChange(${idx},this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bs);border-radius:var(--rm);font-size:13px;background:#fff;color:var(--tp);box-sizing:border-box">
-            ${Array.from({length:c.maxLv},(_,i)=>i+1).map(l=>`<option value="${l}" ${l===c.level?'selected':''}>第 ${l} 級</option>`).join('')}
-          </select>
-        </div>
+      <select onchange="salaryOnTitleChange(${idx},this.value)" style="${ss}">
+        ${SALARY_TITLES.map(t=>`<option value="${t.id}" ${t.id===salaryRows[idx].titleId?'selected':''}>${escapeHtml(t.name)}</option>`).join('')}
+      </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 4px">
+        <select onchange="salaryOnGradeChange(${idx},this.value)" style="${ss}">
+          ${gradeOpts.map(g=>`<option value="${g}" ${g===c.grade?'selected':''}>第 ${g} 職等</option>`).join('')}
+        </select>
+        <select onchange="salaryOnLevelChange(${idx},this.value)" style="${ss}">
+          ${Array.from({length:c.maxLv},(_,i)=>i+1).map(l=>`<option value="${l}" ${l===c.level?'selected':''}>第 ${l} 級</option>`).join('')}
+        </select>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:14px;border-top:0.5px dashed var(--bt)">
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">本俸</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.basic)}</div></div>
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">職務加給</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.title.group.postAllow)}</div></div>
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">專業加給</div><div style="font-size:15px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.title.group.profAllow)}</div></div>
-        <div style="background:var(--ci);border-radius:var(--rm);padding:6px 10px;margin:-6px -10px">
-          <div style="font-size:11px;color:var(--ti);margin-bottom:3px">加總</div>
-          <div style="font-size:17px;font-weight:700;color:var(--ti)">NT$ ${salaryFmt(c.total)}</div>
-        </div>
+      <div style="font-size:11px;color:var(--tt);margin-bottom:10px">職等可選範圍：第 ${c.title.group.gradeMin}～${c.title.group.gradeMax} 職等</div>
+      <div style="border-top:0.5px dashed var(--bt);padding-top:6px">
+        ${salaryLine('本俸',c.basic)}${salaryLine('職務加給',c.title.group.postAllow)}${salaryLine('專業加給',c.title.group.profAllow)}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0;padding:6px 10px;background:var(--ci);border-radius:var(--rm);color:var(--ti)"><span style="font-size:12px;font-weight:600">加總</span><span style="font-size:15px;font-weight:700">NT$ ${salaryFmt(c.total)}</span></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding-top:14px;margin-top:14px;border-top:0.5px dashed var(--bt)">
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣福利金</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.welfare)}</div></div>
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣勞保費</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.li)}</div></div>
-        <div><div style="font-size:11px;color:var(--tt);margin-bottom:3px">代扣健保費</div><div style="font-size:14px;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.ded.nhi)}</div></div>
-        <div style="background:#FAEEDA;border-radius:var(--rm);padding:6px 10px;margin:-6px -10px">
-          <div style="font-size:11px;color:#633806;margin-bottom:3px">應扣合計</div>
-          <div style="font-size:15px;font-weight:700;color:#633806">NT$ ${salaryFmt(c.ded.total)}</div>
-        </div>
+      <div style="border-top:0.5px dashed var(--bt);margin-top:6px;padding-top:6px">
+        ${salaryLine('代扣福利金',c.ded.welfare)}${salaryLine('代扣勞保費',c.ded.li)}${salaryLine('代扣健保費',c.ded.nhi)}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0;padding:6px 10px;background:#FAEEDA;border-radius:var(--rm);color:#633806"><span style="font-size:12px;font-weight:600">應扣合計</span><span style="font-size:14px;font-weight:700">NT$ ${salaryFmt(c.ded.total)}</span></div>
       </div>
-      <div style="margin-top:12px;background:var(--ci);border-radius:var(--rl);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:13px;color:var(--ti);font-weight:500">預估實領金額</div>
-        <div style="font-size:20px;font-weight:700;color:var(--ti)">NT$ ${salaryFmt(c.ded.net)}</div>
-      </div>
-    </div>`;
-  }).join('')
-  + (salaryRows.length<4?`<button onclick="salaryAddRow()" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px dashed var(--bi);color:var(--ti);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rm);cursor:pointer;margin-bottom:20px">＋ 新增一筆試算進行薪資比較</button>`:'')
-  + salaryCompareHtml(calcs);
+    </div>
+    <div style="margin-top:8px;padding:10px 14px;background:var(--ti);border-radius:var(--rm);display:flex;justify-content:space-between;align-items:center;color:#fff"><span style="font-size:12.5px;font-weight:600">預估實領</span><span style="font-size:18px;font-weight:700">NT$ ${salaryFmt(c.ded.net)}</span></div>
+  </div>`;
 }
 function salaryCompareHtml(calcs){
   if(calcs.length<2)return '';
   const base=calcs[0];
-  const rows=calcs.map((c,idx)=>{
-    const diff=c.total-base.total;
-    const diffTxt= idx===0 ? '基準' : (diff>=0?('+NT$ '+salaryFmt(diff)):('-NT$ '+salaryFmt(Math.abs(diff))));
-    const diffColor= idx===0 ? 'var(--ts)' : (diff>=0?'#1D9E75':'#E24B4A');
-    return `<tr style="border-bottom:0.5px solid var(--bt)">
-      <td style="padding:10px;color:var(--tp)">試算 ${idx+1}</td>
-      <td style="padding:10px;color:var(--tp)">${escapeHtml(c.title.name)}／第${c.grade}職等／第${c.level}級</td>
-      <td style="padding:10px;text-align:right;font-weight:600;color:var(--tp)">NT$ ${salaryFmt(c.total)}</td>
-      <td style="padding:10px;text-align:right;color:var(--ts)">NT$ ${salaryFmt(c.ded.net)}</td>
-      <td style="padding:10px;text-align:right;font-weight:600;color:${diffColor}">${diffTxt}</td>
-    </tr>`;
+  const parts=calcs.map((c,i)=>`<span style="font-size:13px;color:var(--tp)"><span style="color:var(--ti);font-weight:500">試算${i+1}</span> 實領 <b>NT$ ${salaryFmt(c.ded.net)}</b></span>`).join('<span style="color:var(--tt)">vs</span>');
+  const pills=calcs.slice(1).map((c,i)=>{
+    const dn=c.ded.net-base.ded.net, dt=c.total-base.total;
+    const tag=calcs.length>2?`試算${i+2}`:'';
+    return `${salaryDiffPill(`${tag}實領差`,dn,true)}${salaryDiffPill(`${tag}加總差`,dt,false)}`;
   }).join('');
-  return `<div class="card">
-    <div style="font-size:14px;font-weight:500;color:var(--tp);margin-bottom:4px">薪資比較</div>
-    <div style="font-size:12px;color:var(--ts);margin-bottom:14px">以「試算 1」為基準，顯示其他試算與其加總之差額（差額以稅前加總計算）。</div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">
-      <thead><tr style="text-align:left;color:var(--ts);border-bottom:0.5px solid var(--bt)">
-        <th style="padding:8px 10px;font-weight:500">試算</th>
-        <th style="padding:8px 10px;font-weight:500">職稱／職等／職級</th>
-        <th style="padding:8px 10px;font-weight:500;text-align:right">加總</th>
-        <th style="padding:8px 10px;font-weight:500;text-align:right">預估實領</th>
-        <th style="padding:8px 10px;font-weight:500;text-align:right">與基準差額</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>
+  return `<div class="card" style="margin-bottom:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--ts)">比較摘要</span>${parts}
+    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">${pills}</span>
   </div>`;
+}
+function salaryRenderRows(){
+  const host=document.getElementById('salary-rows');
+  if(!host)return;
+  const calcs=salaryRows.map(salaryRowCalc);
+  const n=calcs.length;
+  host.innerHTML=salaryCompareHtml(calcs)
+    + `<div style="display:grid;grid-template-columns:repeat(${Math.min(n,2)},minmax(0,1fr));gap:12px;align-items:start">${calcs.map((c,i)=>salaryCardHtml(c,i,n)).join('')}</div>`
+    + (n<4?`<button onclick="salaryAddRow()" style="margin-top:12px;background:#fff;border:1px dashed var(--bi);color:var(--ti);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rm);cursor:pointer">＋ 新增一筆試算進行比較（最多4筆）</button>`:'')
+    + `<div style="font-size:11px;color:var(--tt);margin-top:10px">勞保／健保依現行分級表估算，福利金依職工福利金條例0.5%計算，僅供參考，實際金額以薪資單為準。</div>`;
 }
 function salaryRenderRef(){
   const host=document.getElementById('salary-ref-body');
