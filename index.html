@@ -264,7 +264,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 81</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 82</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -663,15 +663,17 @@ function salaryCardHtml(c,idx,n){
 function salaryCompareHtml(calcs){
   if(calcs.length<2)return '';
   const base=calcs[0];
-  const parts=calcs.map((c,i)=>`<span style="font-size:13px;color:var(--tp)"><span style="color:var(--ti);font-weight:500">試算${i+1}</span> 實領 <b>NT$ ${salaryFmt(c.ded.net)}</b></span>`).join('<span style="color:var(--tt)">vs</span>');
-  const pills=calcs.slice(1).map((c,i)=>{
-    const dn=c.ded.net-base.ded.net, dt=c.total-base.total;
-    const tag=calcs.length>2?`試算${i+2}`:'';
-    return `${salaryDiffPill(`${tag}實領差`,dn,true)}${salaryDiffPill(`${tag}加總差`,dt,false)}`;
+  const items=calcs.map((c,i)=>{
+    const dn=c.ded.net-base.ded.net;
+    const pill=i===0?`<span style="font-size:11px;color:var(--tt)">基準</span>`:salaryDiffPill('實領差',dn,true)+salaryDiffPill('加總差',c.total-base.total,false);
+    return `<div style="flex:1 1 0;min-width:200px;padding:4px 14px;${i>0?'border-left:0.5px solid var(--bt);':''}">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px"><span style="font-size:12px;font-weight:500;color:var(--ti)">試算${i+1}</span><span style="font-size:13px;font-weight:600;color:var(--tp)">${escapeHtml(c.title.name)}</span><span style="font-size:12px;color:var(--ts)">${c.grade}等${c.level}級</span></div>
+      <div style="font-size:12px;color:var(--ts);margin-bottom:6px">預估實領 <b style="font-size:15px;color:var(--tp)">NT$ ${salaryFmt(c.ded.net)}</b></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${pill}</div>
+    </div>`;
   }).join('');
-  return `<div class="card" style="margin-bottom:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:12px;color:var(--ts)">比較摘要</span>${parts}
-    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">${pills}</span>
+  return `<div class="card" style="margin-bottom:12px;padding:12px 4px;display:flex;align-items:stretch;gap:0;flex-wrap:wrap">
+    <div style="padding:4px 14px;font-size:12px;color:var(--ts);display:flex;align-items:center">比較摘要</div>${items}
   </div>`;
 }
 function salaryRenderRows(){
@@ -680,7 +682,7 @@ function salaryRenderRows(){
   const calcs=salaryRows.map(salaryRowCalc);
   const n=calcs.length;
   host.innerHTML=salaryCompareHtml(calcs)
-    + `<div style="display:grid;grid-template-columns:repeat(${Math.min(n,2)},minmax(0,1fr));gap:12px;align-items:start">${calcs.map((c,i)=>salaryCardHtml(c,i,n)).join('')}</div>`
+    + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:start">${calcs.map((c,i)=>salaryCardHtml(c,i,n)).join('')}</div>`
     + (n<4?`<button onclick="salaryAddRow()" style="margin-top:12px;background:#fff;border:1px dashed var(--bi);color:var(--ti);font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--rm);cursor:pointer">＋ 新增一筆試算進行比較（最多4筆）</button>`:'')
     + `<div style="font-size:11px;color:var(--tt);margin-top:10px">勞保／健保依現行分級表估算，福利金依職工福利金條例0.5%計算，僅供參考，實際金額以薪資單為準。</div>`;
 }
