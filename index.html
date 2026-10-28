@@ -98,6 +98,8 @@ textarea{resize:vertical;min-height:80px}
 .rich-content-view b,.rich-content-view strong{font-weight:700}
 .rich-content-view u{text-decoration:underline}
 .rich-content-view s,.rich-content-view strike{text-decoration:line-through}
+.hl-red{color:#E24B4A}
+.rich-toolbar button[data-cmd=hlRed]{color:#E24B4A;font-weight:700}
 .info-box{background:var(--ci);border:0.5px solid var(--bi);border-radius:var(--rm);padding:10px 14px;font-size:12px;color:var(--ti);margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
 .warn-box{background:#FAEEDA;border:0.5px solid #FAC775;border-radius:var(--rm);padding:10px 14px;font-size:12px;color:#633806;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
@@ -264,7 +266,7 @@ function toggleMobileSidebar(forceState){
       <div class="nch" id="nch-perm" onclick="gp('admin-perm',this)" style="display:none">系統權限</div>
     </div>
     <div class="lgout" onclick="doLogout()"><i class="ti ti-logout" style="font-size:15px"></i>登出</div>
-    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 82</div>
+    <div style="font-size:10px;color:var(--tt);text-align:center;margin-top:10px;padding-bottom:6px">系統版本 build 83</div>
   </nav>
   <main class="main" id="main"></main>
 </div>
@@ -1106,6 +1108,15 @@ function applyBRestrictions(){
 function isValidDate(s){return !!(s && /^\d{4}-\d{2}-\d{2}$/.test(s));}
 // ===== 富文字內容處理（勤前指示／通告內容欄位：支援粗體/底線/刪除線）=====
 const RICH_ALLOWED_TAGS={B:'B',STRONG:'B',U:'U',S:'S',STRIKE:'S',DEL:'S',BR:'BR',DIV:'DIV',P:'DIV'};
+function isRedCssColor(str){
+  const s=(str||'').trim().toLowerCase();
+  if(!s)return false;
+  if(s==='red')return true;
+  let m=s.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if(m){let x=m[1];if(x.length===3)x=x.split('').map(c=>c+c).join('');return isRedRGB(parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16));}
+  m=s.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  return !!m&&isRedRGB(+m[1],+m[2],+m[3]);
+}
 function sanitizeRichHtml(rawHtml){
   const container=document.createElement('div');
   container.innerHTML=rawHtml||'';
@@ -1123,10 +1134,13 @@ function sanitizeRichHtml(rawHtml){
           const bold=style.includes('line-through')===false&&(style.includes('bold')||parseInt(fw)>=600||tag==='FONT'&&child.getAttribute('weight')==='bold');
           const underline=style.includes('underline')&&!style.includes('none');
           const strike=style.includes('line-through');
+          const cssColor=(child.style&&child.style.color)||child.getAttribute('color')||'';
+          const red=(child.classList&&child.classList.contains('hl-red'))||isRedCssColor(cssColor);
           let inner=walk(child);
           if(strike)inner=`<s>${inner}</s>`;
           if(underline)inner=`<u>${inner}</u>`;
           if(bold)inner=`<b>${inner}</b>`;
+          if(red&&inner.replace(/<[^>]+>/g,'').trim())inner=`<span class="hl-red">${inner}</span>`;
           out+=inner;
           return;
         }
@@ -1171,7 +1185,14 @@ function initRichEditor(editorId,toolbarId){
   if(!editor||!toolbar)return;
   toolbar.querySelectorAll('button[data-cmd]').forEach(btn=>{
     btn.onmousedown=e=>e.preventDefault(); // 避免按按鈕時編輯區失焦
-    btn.onclick=()=>{ editor.focus(); document.execCommand(btn.dataset.cmd,false,null); updateRichToolbarState(toolbarId); };
+    btn.onclick=()=>{
+      editor.focus();
+      if(btn.dataset.cmd==='hlRed'){
+        document.execCommand('styleWithCSS',false,true);
+        document.execCommand('foreColor',false,richSelectionIsRed()?'#1a1a18':'#E24B4A'); // 取消紅字時改回一般黑色，存檔時過濾器會自動移除
+      } else { document.execCommand(btn.dataset.cmd,false,null); }
+      updateRichToolbarState(toolbarId);
+    };
   });
   editor.addEventListener('paste',e=>{
     e.preventDefault();
@@ -1183,11 +1204,12 @@ function initRichEditor(editorId,toolbarId){
   editor.addEventListener('keyup',()=>updateRichToolbarState(toolbarId));
   editor.addEventListener('mouseup',()=>updateRichToolbarState(toolbarId));
 }
+function richSelectionIsRed(){ try{ return isRedCssColor(document.queryCommandValue('foreColor')); }catch(e){ return false; } }
 function updateRichToolbarState(toolbarId){
   const toolbar=document.getElementById(toolbarId);
   if(!toolbar)return;
   toolbar.querySelectorAll('button[data-cmd]').forEach(btn=>{
-    try{ btn.classList.toggle('active',document.queryCommandState(btn.dataset.cmd)); }catch(e){}
+    try{ btn.classList.toggle('active',btn.dataset.cmd==='hlRed'?richSelectionIsRed():document.queryCommandState(btn.dataset.cmd)); }catch(e){}
   });
 }
 function richToolbarHtml(toolbarId){
@@ -1195,6 +1217,7 @@ function richToolbarHtml(toolbarId){
     <button type="button" data-cmd="bold" title="粗體">B</button>
     <button type="button" data-cmd="underline" title="底線">U</button>
     <button type="button" data-cmd="strikeThrough" title="刪除線">S</button>
+    <button type="button" data-cmd="hlRed" title="紅字（再按一次取消）">A</button>
   </div>`;
 }
 function escapeRegex(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
@@ -4560,6 +4583,159 @@ function extractDocMetaFromText(text, fileName){
   return {docNo, dept, tier, version, approvedDate, title};
 }
 
+/* ===== 紅字辨識：讀取 Google Sheets 匯出的 xlsx，取得文字顏色（不需變更原始試算表）===== */
+function isRedRGB(r,g,b){return r>=140&&g<=r*0.45&&b<=r*0.45;}
+let _jszipLoadingPromise=null;
+function ensureJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  if(_jszipLoadingPromise) return _jszipLoadingPromise;
+  _jszipLoadingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=()=>resolve(window.JSZip);
+    s.onerror=()=>{_jszipLoadingPromise=null;reject(new Error('解壓縮套件載入失敗，請檢查網路連線'));};
+    document.head.appendChild(s);
+  });
+  return _jszipLoadingPromise;
+}
+function xlsxXml(str){return new DOMParser().parseFromString(str,'application/xml');}
+function xlsxColorToRgb(colorEl){
+  if(!colorEl)return null;
+  const rgb=colorEl.getAttribute('rgb');
+  if(rgb&&/^[0-9a-fA-F]{6,8}$/.test(rgb)){const h=rgb.slice(-6);return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  const idx=colorEl.getAttribute('indexed');
+  if(idx==='10'||idx==='2')return [255,0,0];
+  return null; // 佈景主題色、自動色等一律視為非紅字
+}
+function xlsxColorIsRed(colorEl){const c=xlsxColorToRgb(colorEl);return !!c&&isRedRGB(c[0],c[1],c[2]);}
+function xlsxChild(el,name){return Array.from(el.children).find(e=>e.localName===name)||null;}
+function xlsxRunsFromEl(el){ // el：<si> 或 <is>；red 為 null 表示沿用儲存格預設字色
+  const runs=[];
+  Array.from(el.children).forEach(ch=>{
+    if(ch.localName==='t'){runs.push({t:ch.textContent,red:null});}
+    else if(ch.localName==='r'){
+      let t='',red=null;
+      Array.from(ch.children).forEach(x=>{
+        if(x.localName==='t')t+=x.textContent;
+        else if(x.localName==='rPr'){const c=xlsxChild(x,'color');if(c)red=xlsxColorIsRed(c);}
+      });
+      runs.push({t,red});
+    }
+  });
+  return runs;
+}
+async function parseXlsxSheets(ab){
+  const JSZip=await ensureJSZip();
+  const zip=await JSZip.loadAsync(ab);
+  const read=async p=>{const f=zip.file(p);return f?await f.async('string'):null;};
+  const wbXml=await read('xl/workbook.xml');
+  if(!wbXml)throw new Error('Excel 檔案內容格式無法辨識');
+  const relXml=await read('xl/_rels/workbook.xml.rels');
+  const sstXml=await read('xl/sharedStrings.xml');
+  const stylesXml=await read('xl/styles.xml');
+  const wb=xlsxXml(wbXml);
+  const relMap={};
+  if(relXml)Array.from(xlsxXml(relXml).getElementsByTagNameNS('*','Relationship')).forEach(r=>{relMap[r.getAttribute('Id')]=r.getAttribute('Target');});
+  const fontRed=[],xfRed=[];
+  if(stylesXml){
+    const st=xlsxXml(stylesXml);
+    const fontsEl=st.getElementsByTagNameNS('*','fonts')[0];
+    if(fontsEl)Array.from(fontsEl.children).forEach(f=>{const c=xlsxChild(f,'color');fontRed.push(!!c&&xlsxColorIsRed(c));});
+    const xfsEl=st.getElementsByTagNameNS('*','cellXfs')[0];
+    if(xfsEl)Array.from(xfsEl.children).forEach(xf=>xfRed.push(!!fontRed[parseInt(xf.getAttribute('fontId')||'0',10)]));
+  }
+  const sst=[];
+  if(sstXml)Array.from(xlsxXml(sstXml).getElementsByTagNameNS('*','si')).forEach(si=>sst.push(xlsxRunsFromEl(si)));
+  const sheets=[];
+  for(const sh of Array.from(wb.getElementsByTagNameNS('*','sheet'))){
+    const name=sh.getAttribute('name');
+    const rid=sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||sh.getAttribute('r:id');
+    let target=relMap[rid];
+    if(!target)continue;
+    target=target.replace(/^\//,'');
+    const xml=await read(target.startsWith('xl/')?target:('xl/'+target));
+    if(!xml)continue;
+    const cells=new Map();
+    Array.from(xlsxXml(xml).getElementsByTagNameNS('*','c')).forEach(c=>{
+      const m=(c.getAttribute('r')||'').match(/^([A-Z]+)(\d+)$/);
+      if(!m)return;
+      let col=0;for(let i=0;i<m[1].length;i++)col=col*26+(m[1].charCodeAt(i)-64);
+      col-=1;const row=parseInt(m[2],10)-1;
+      const t=c.getAttribute('t');
+      const baseRed=!!xfRed[parseInt(c.getAttribute('s')||'0',10)];
+      let runs=null;
+      if(t==='s'){const v=c.getElementsByTagNameNS('*','v')[0];if(v)runs=sst[parseInt(v.textContent,10)]||null;}
+      else if(t==='inlineStr'){const is=c.getElementsByTagNameNS('*','is')[0];if(is)runs=xlsxRunsFromEl(is);}
+      else if(t==='str'){const v=c.getElementsByTagNameNS('*','v')[0];if(v)runs=[{t:v.textContent,red:null}];}
+      if(!runs)return;
+      cells.set(row+','+col,{runs:runs.map(r=>({t:r.t,red:r.red===null?baseRed:r.red}))});
+    });
+    sheets.push({name,cells});
+  }
+  return sheets;
+}
+function xlsxPickSheet(sheets,csvRows){ // 以CSV內容比對，找出xlsx中對應的工作表（不依賴工作表名稱或gid）
+  const nl=s=>(s||'').replace(/\r\n?/g,'\n').trim();
+  let best=null,bestScore=0;
+  sheets.forEach(sh=>{
+    let score=0;
+    for(let r=0;r<Math.min(csvRows.length,60);r++){
+      const row=csvRows[r]||[];
+      for(let c=0;c<row.length;c++){
+        const csvT=nl(row[c]);if(!csvT)continue;
+        const cell=sh.cells.get(r+','+c);if(!cell)continue;
+        if(nl(cell.runs.map(x=>x.t).join(''))===csvT)score++;
+      }
+    }
+    if(score>bestScore){bestScore=score;best=sh;}
+  });
+  return bestScore>=3?best:null;
+}
+async function fetchSheetRedInfo(sheetId,csvRows){
+  const res=await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&_ts=${Date.now()}`,{cache:'no-store'});
+  if(!res.ok)throw new Error('無法下載試算表的 Excel 版本（HTTP '+res.status+'）');
+  const sheets=await parseXlsxSheets(await res.arrayBuffer());
+  const sh=xlsxPickSheet(sheets,csvRows);
+  if(!sh)throw new Error('Excel 版本中找不到與目前工作表對應的內容');
+  return {cell:(r,c)=>sh.cells.get(r+','+c)||null};
+}
+// 依「事項內容」儲存格的文字顏色，產生內文（【標題】之後的部分）的紅字HTML
+// 回傳：{html,redCount}＝有紅字；null＝無紅字；{unknown:true}＝無法與CSV文字對應（此時不判斷紅字）
+function xlsxBodyRedHtml(rawContent,cell){
+  const nl=s=>(s||'').replace(/\r\n?/g,'\n');
+  let X='';const mask=[];
+  cell.runs.forEach(r=>{const t=nl(r.t);for(let i=0;i<t.length;i++){X+=t.charAt(i);mask.push(!!r.red);}});
+  if(X.trim()!==nl(rawContent).trim())return {unknown:true};
+  const lead=X.length-X.trimStart().length;
+  const T=X.trim(),M=mask.slice(lead,lead+T.length);
+  const bm=T.match(/【(.+?)】([\s\S]*)/);
+  if(!bm)return null;
+  const g2=bm[2],g2start=bm.index+bm[0].length-g2.length;
+  const bs=g2start+(g2.length-g2.trimStart().length),body=g2.trim();
+  let html='',redCount=0,i=0;
+  while(i<body.length){
+    let j=i;const red=M[bs+i];
+    while(j<body.length&&M[bs+j]===red)j++;
+    const seg=body.slice(i,j),esc=escapeHtml(seg).replace(/\n/g,'<br>');
+    if(red&&seg.trim()){html+=`<span class="hl-red">${esc}</span>`;redCount++;}else html+=esc;
+    i=j;
+  }
+  return redCount?{html,redCount}:null;
+}
+function redSig(html){
+  if(!html)return '';
+  const d=document.createElement('div');d.innerHTML=html;
+  return Array.from(d.querySelectorAll('.hl-red')).map(e=>(e.textContent||'').trim()).filter(Boolean).join('|');
+}
+function mergeMarkerLine(){
+  const today=new Date().toISOString().slice(0,10);
+  return `【以下為資料庫原有內容，於 ${today} Sheets匯入時自動合併保留，請確認是否仍需要，若已無關可自行刪除】`;
+}
+function mergeContentHtml(p,oldContent,oldHtml){
+  const toHtml=t=>escapeHtml(t||'').replace(/\n/g,'<br>');
+  return (p.contentHtml||toHtml(p.content))+'<br><br>'+escapeHtml(mergeMarkerLine())+'<br>'+(oldHtml||toHtml(oldContent));
+}
+
 async function importFromSheets(){
   const urlInput=document.getElementById('dsu')?.value?.trim();
   const sheetName=document.getElementById('dsn')?.value?.trim();
@@ -4579,6 +4755,10 @@ async function importFromSheets(){
     const text=await res.text();
     const rows=parseCSV(text);
     if(rows.length<2){area.innerHTML='<div class="pholder">試算表無資料</div>';return;}
+    // 另外取得Excel版本以辨識紅字；失敗不影響純文字匯入
+    let redInfo=null,redWarn='';
+    try{ area.innerHTML='<div class="pholder">連線中…（讀取紅字標記）</div>'; redInfo=await fetchSheetRedInfo(sheetId,rows); }
+    catch(e){ redWarn=`<div class="info-box" style="background:#FAEEDA;border-color:#FAC775;color:#633806"><i class="ti ti-alert-triangle"></i>無法讀取紅字標記（${escapeHtml(e.message||String(e))}），本次僅匯入純文字內容，未帶入紅字。</div>`; }
     const headers=rows[0].map(h=>(h||'').trim());
     const idx=(aliases)=>headers.findIndex(h=>aliases.some(a=>h.includes(a)));
     let iCat=idx(['分類','類別']);
@@ -4599,6 +4779,12 @@ async function importFromSheets(){
       const bm=rawContent.match(/【(.+?)】([\s\S]*)/);
       if(bm){title=bm[1].trim();content=bm[2].trim();}
       if(!title)continue; // 合併儲存格造成的空白延伸列，非真實資料，直接略過
+      let contentHtml='',redCount=0,redKnown=false;
+      if(redInfo){
+        const cell=redInfo.cell(r,iContent);
+        const res=cell?xlsxBodyRedHtml(rawContent,cell):{unknown:true};
+        if(!res||!res.unknown){redKnown=true;if(res){contentHtml=res.html;redCount=res.redCount;}}
+      }
       const catText=((iCat>=0?row[iCat]:'')||'').trim();
       const catNorm=norm(catText);
       const cat=DUTY_CATEGORIES.find(c=>catNorm.includes(norm(c.name))||(catNorm&&norm(c.name).includes(catNorm)));
@@ -4609,7 +4795,8 @@ async function importFromSheets(){
         issuedDate: parseMinguoDate(iFrom>=0?row[iFrom]:''),
         expiryDate: parseMinguoDate(iTo>=0?row[iTo]:''),
         announcer: ((iAnn>=0?row[iAnn]:'')||'').trim(),
-        seqNo: ((iSeq>=0?row[iSeq]:'')||'').trim()
+        seqNo: ((iSeq>=0?row[iSeq]:'')||'').trim(),
+        contentHtml, redCount, _redKnown:redKnown
       });
     }
     if(parsed.length===0){area.innerHTML='<div class="pholder">試算表無有效資料列</div>';return;}
@@ -4642,18 +4829,21 @@ async function importFromSheets(){
       // 內容改用「上次同步基準」比對，避免合併後資料庫內容變長，下次卻誤判成又有新異動
       const baseline=existing.data.lastSheetContent!==undefined?existing.data.lastSheetContent:existing.data.content;
       const contentChanged=normWs(p.content)!==normWs(baseline);
-      const changed=[...scalarChanged, ...(contentChanged?['內容（將自動合併保留兩邊）']:[]), ...(p._migratingSeqNo?['已補上項次編號']:[])];
+      const redChanged=!!p._redKnown&&redSig(p.contentHtml)!==redSig(existing.data.contentHtml);
+      const changed=[...scalarChanged, ...(contentChanged?['內容（將自動合併保留兩邊）']:[]), ...(redChanged?['紅字標記']:[]), ...(p._migratingSeqNo?['已補上項次編號']:[])];
       if(changed.length===0){p._status='dup';}
-      else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;p._contentChanged=contentChanged;}
+      else{p._status='update';p._docId=existing.id;p._changed=changed;p._oldData=existing.data;p._contentChanged=contentChanged;p._redChanged=redChanged;}
     });
     const newRows=parsed.filter(p=>p._status==='new');
     const updateRows=parsed.filter(p=>p._status==='update');
     const dupCount=parsed.filter(p=>p._status==='dup').length;
     window._sheetsImportRows=[...newRows,...updateRows];
     let rowIdx=0;
-    const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span> <button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="showSheetsDiff(${i})">檢視差異</button>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>`;};
+    const renderRow=p=>{const i=rowIdx++;const cat=DUTY_CATEGORIES.find(c=>c.id===p.category);return `<tr><td><input type="checkbox" class="sheets-row-chk" data-idx="${i}" checked></td><td>${cat?catBadge(cat):('<span class="cat-badge" style="background:#f8d7da;color:#721c24">未辨識：'+(p.categoryText||'空白')+'</span>')}</td><td>${p.title}${p.redCount?` <span class="cat-badge" style="background:#FCEBEB;color:#A32D2D">含紅字 ${p.redCount} 處</span>`:''}${!p.announcer?' <span style="color:#E24B4A">（缺宣達者）</span>':''}${!p.issuedDate?' <span style="color:#E24B4A">（缺發布日期）</span>':''}${p._status==='update'?` <span style="color:#856404">（異動：${p._changed.join('、')}）</span> <button class="btn btn-sm" style="padding:2px 8px;font-size:11px" onclick="showSheetsDiff(${i})">檢視差異</button>`:''}</td><td>${p.issuedDate||'—'}</td><td>${p.expiryDate||'—'}</td><td>${p.announcer||'—'}</td></tr>${p.contentHtml?`<tr><td></td><td colspan="5" style="background:var(--cs);padding:8px 14px"><div style="font-size:11px;color:var(--tt);margin-bottom:4px">內容預覽（紅字為 Sheets 中的紅色文字）</div><div class="rich-content-view" style="font-size:12px">${p.contentHtml}</div></td></tr>`:''}`;};
+    const redTotal=parsed.filter(p=>p.redCount>0).length;
     area.innerHTML=`
-      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆有異動（分類/宣達者/到期日期將依Sheets覆蓋；內容若不同將自動合併保留兩邊，不會互相蓋掉）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）</div>
+      ${redWarn}
+      <div class="info-box"><i class="ti ti-info-circle"></i>共讀取 ${parsed.length} 筆，其中 ${dupCount} 筆完全相同（略過）、${updateRows.length} 筆有異動（分類/宣達者/到期日期將依Sheets覆蓋；內容若不同將自動合併保留兩邊，不會互相蓋掉）、${newRows.length} 筆為全新資料（比對已自動忽略純空白差異）${redInfo?(redTotal?`。<b>另偵測到 ${redTotal} 筆含紅字內容，匯入後會保留紅字顯示。</b>`:'。已檢查文字顏色，未發現紅字內容。'):''}</div>
       ${(newRows.length+updateRows.length)?`<div style="margin-bottom:8px"><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="sheets-select-all" checked onchange="document.querySelectorAll('.sheets-row-chk').forEach(c=>c.checked=this.checked)"> 全選／全不選</label></div>
       <div class="card" style="padding:0;overflow:hidden;max-height:360px;overflow-y:auto">
         <table class="vtbl"><thead><tr><th style="width:36px"></th><th>分類</th><th>標題</th><th>發布日期</th><th>到期日期</th><th>宣達者</th></tr></thead>
@@ -4676,8 +4866,7 @@ function mergeContent(oldContent, newSheetContent){
   if(oldN===newN) return newSheetContent;
   if(newN.includes(oldN)) return newSheetContent; // Sheets版本已完整涵蓋資料庫原內容，直接採用
   if(oldN.includes(newN)) return oldContent; // 資料庫原內容已完整涵蓋Sheets版本，維持原狀
-  const today=new Date().toISOString().slice(0,10);
-  return `${newSheetContent}\n\n【以下為資料庫原有內容，於 ${today} Sheets匯入時自動合併保留，請確認是否仍需要，若已無關可自行刪除】\n${oldContent}`;
+  return `${newSheetContent}\n\n${mergeMarkerLine()}\n${oldContent}`;
 }
 
 function showSheetsDiff(idx){
@@ -4748,12 +4937,17 @@ async function confirmSheetsImport(){
         if(p._status==='update'){
           const oldContent=p._oldData?(p._oldData.content||''):'';
           const mergedContent=p._contentChanged?mergeContent(oldContent,p.content||''):oldContent;
-          batch.update(doc(window._db,'duty_briefs',p._docId),{
+          const upd={
             category:p.category||'', announcer:p.announcer||'',
             expiryDate:p.expiryDate||null, content:mergedContent,
             lastSheetContent:p.content||'', seqNo:p.seqNo||'',
             updatedAt: serverTimestamp(), updatedBy: window._uid, updatedFromSheets:true
-          });
+          };
+          // 紅字內容（contentHtml）需與純文字內容保持一致，避免畫面顯示舊版內容
+          if(!p._contentChanged){ if(p._redChanged) upd.contentHtml=p.contentHtml||''; }
+          else if(mergedContent===(p.content||'')) upd.contentHtml=p.contentHtml||'';
+          else if(mergedContent!==oldContent) upd.contentHtml=p._redKnown?mergeContentHtml(p,oldContent,p._oldData&&p._oldData.contentHtml):'';
+          batch.update(doc(window._db,'duty_briefs',p._docId),upd);
           updated++;
           logEntries.push({docId:p._docId, title:p.title, extra:`Sheets更新，異動欄位：${(p._changed||[]).join('、')}`});
         } else {
@@ -4763,6 +4957,7 @@ async function confirmSheetsImport(){
             unit:'', issuedDate:p.issuedDate||null, expiryDate:p.expiryDate||null,
             lastSheetContent:p.content||'', seqNo:p.seqNo||'',
             attachments:[], status:'active',
+            ...(p.contentHtml?{contentHtml:p.contentHtml}:{}),
             createdAt: serverTimestamp(), createdBy: window._uid, importedFromSheets:true
           });
           added++;
